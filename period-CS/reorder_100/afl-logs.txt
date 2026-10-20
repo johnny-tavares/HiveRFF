@@ -1,0 +1,487 @@
+[0;36mafl-fuzz [1;97m2.57b[0m by <lcamtuf@google.com>
+[1;92m[+] [0mLooks like we're not running on a tty, so I'll be a bit less verbose.[0m
+[1;92m[+] [0mYou have 8 CPU cores and 2 runnable tasks (utilization: 25%).[0m
+[1;92m[+] [0mTry parallel jobs - see docs/parallel_fuzzing.txt.[0m
+[1;93m[!] [1;97mWARNING: [0mNot binding to a CPU core (AFL_NO_AFFINITY set).[0m
+[1;94m[*] [0mChecking core_pattern...[0m
+[1;94m[*] [0mChecking CPU scaling governor...[0m
+[1;94m[*] [0mSetting up output directories...[0m
+[1;94m[*] [0mScanning 'afl-in'...[0m
+[1;92m[+] [0mNo auto-generated dictionary tokens to reuse.[0m
+[1;94m[*] [0mCreating hard links for all input files...[0m
+[1;94m[*] [0mValidating target binary...[0m
+[1;94m[*] [0mAttempting dry run with 'id:000000,orig:hi.txt'...[0m
+[1;94m[*] [0mSpinning up the fork server...[0m
+[1;92m[+] [0mAll right - fork server is up.[0m
+[1;90m    len = 3, map size = 41, exec speed = 7153 us
+[0m[1;92m[+] [0mAll test cases processed.[0m
+
+[1;92m[+] [0mHere are some useful stats:
+
+[1;90m    Test case count : [0m1 favored, 0 variable, 1 total
+[1;90m       Bitmap range : [0m41 to 41 bits (average: 41.00 bits)
+[1;90m        Exec timing : [0m7153 to 7153 us (average: 7153 us)
+[0m
+[1;92m[+] [0mAll set and ready to roll![0m
+[1;94m[*] [0mEntering queue cycle 1.[0m
+[1;94m[*] [0mFuzzing test case #0 (1 total, 0 uniq crashes found)...[0m
+{'140737347295232': '104209', '140737338590976': '104211', '140737330198272': '104212', '140737321805568': '104213', '140737313412864': '104214', '140737305020160': '104215', '140737296627456': '104216', '140737219917568': '104217', '140737211524864': '104218', '140737203132160': '104219', '140737194739456': '104220', '140737186346752': '104221', '140737177954048': '104222', '140737169561344': '104223', '140737018590976': '104224', '140737010198272': '104225', '140737001805568': '104226', '140736993412864': '104227', '140736985020160': '104228', '140736976627456': '104229', '140736968234752': '104230', '140736884373248': '104231', '140736875980544': '104232', '140736867587840': '104233', '140736859195136': '104234', '140736850802432': '104235', '140736842409728': '104236', '140736834017024': '104237', '140736825624320': '104238', '140736817231616': '104239', '140736808838912': '104240', '140736800446208': '104241', '140736792053504': '104242', '140736783660800': '104243', '140736775268096': '104244', '140736766875392': '104245', '140736758482688': '104246', '140736750089984': '104247', '140736741697280': '104248', '140736733304576': '104249', '140736724911872': '104250', '140736716519168': '104251', '140736708126464': '104252', '140736699733760': '104253', '140736691341056': '104254', '140736682948352': '104255', '140736674555648': '104256', '140736666162944': '104257', '140736657770240': '104258', '140736649377536': '104259', '140736640984832': '104260', '140736632592128': '104261', '140736624199424': '104262', '140736615806720': '104263', '140736607414016': '104264', '140736599021312': '104265', '140736590628608': '104266', '140736582235904': '104267', '140736573843200': '104268', '140736565450496': '104269', '140736557057792': '104270', '140736548665088': '104271', '140736540272384': '104272', '140736531879680': '104273', '140736523486976': '104274', '140736515094272': '104275', '140736506701568': '104276', '140736498308864': '104277', '140736489916160': '104278', '140736481523456': '104279', '140736473130752': '104280', '140736464738048': '104281', '140736456345344': '104282', '140736447952640': '104283', '140736439559936': '104284', '140736431167232': '104285', '140736422774528': '104286', '140736414381824': '104287', '140736405989120': '104288', '140736397596416': '104289', '140736389203712': '104290', '140736380811008': '104291', '140736372418304': '104292', '140736364025600': '104293', '140736355632896': '104294', '140736347240192': '104295', '140736338847488': '104296', '140736330454784': '104297', '140736322062080': '104298', '140736313669376': '104299', '140736305276672': '104300', '140736296883968': '104301', '140736288491264': '104302', '140736280098560': '104303', '140736271705856': '104304', '140736263313152': '104305', '140736254920448': '104306', '140736246527744': '104307', '140736238135040': '104308', '140736229742336': '104309', '140736221349632': '104310'}
+start filtering!
+source file: events.log.temp
+target file: comb.log
+Analysis complete
+Number of 'racy' events found = 199
+Number of 'racy' lines found = 5
+Time for analysis = 167 milliseconds
+Racy events id: [1, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83, 84, 85, 86, 87, 88, 89, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99, 100, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112, 113, 114, 115, 116, 117, 118, 119, 120, 121, 122, 123, 124, 125, 126, 127, 128, 129, 130, 131, 132, 133, 134, 135, 136, 137, 138, 139, 140, 141, 142, 143, 144, 145, 146, 147, 148, 149, 150, 151, 152, 153, 154, 155, 156, 157, 158, 159, 160, 161, 162, 163, 164, 165, 166, 167, 168, 169, 170, 171, 172, 173, 174, 175, 176, 177, 178, 179, 180, 181, 182, 183, 184, 185, 186, 187, 188, 189, 190, 191, 192, 193, 194, 195, 196, 197, 198, 199, 200]
+Racy lines: [4199781, 4199862, 4199848, 4199770, 4199820]
+During Score Normalization: Max score is 0!
+started writing to JSON file
+finished writing to JSON file
+During Score Normalization: Max score is 0!
+[4199820|4199770, 4199848|4199770, 4199862|4199781]
+[0.0, 0.0, 0.0]
+length of the r/w list: 3
+{'140737347295232': '104437', '140737338590976': '104439', '140737330198272': '104440', '140737321805568': '104441', '140737313412864': '104442', '140737305020160': '104443', '140737296627456': '104444', '140736951482112': '104445', '140736943089408': '104446', '140736934696704': '104447', '140736926304000': '104448', '140736917911296': '104449', '140736909518592': '104450', '140736901125888': '104451', '140736347502336': '104452', '140736339109632': '104453', '140736330716928': '104454', '140736322324224': '104455', '140736313931520': '104456', '140736305538816': '104457', '140736297146112': '104458', '140735810631424': '104459', '140735802238720': '104460', '140735793846016': '104461', '140735785453312': '104462', '140735777060608': '104463', '140735768667904': '104464', '140735760275200': '104465', '140735273760512': '104466', '140735265367808': '104467', '140735256975104': '104468', '140735248582400': '104469', '140735240189696': '104470', '140735231796992': '104471', '140735223404288': '104472', '140734736889600': '104473', '140734728496896': '104474', '140734720104192': '104475', '140734711711488': '104476', '140734703318784': '104477', '140734694926080': '104478', '140734686533376': '104479', '140734200018688': '104480', '140734191625984': '104481', '140734183233280': '104482', '140734174840576': '104483', '140734166447872': '104484', '140734158055168': '104485', '140734149662464': '104486', '140733663147776': '104487', '140733654755072': '104488', '140733646362368': '104489', '140733637969664': '104490', '140733629576960': '104491', '140733621184256': '104492', '140733612791552': '104493', '140733126276864': '104494', '140733117884160': '104495', '140733109491456': '104496', '140733101098752': '104497', '140733092706048': '104498', '140733084313344': '104499', '140733075920640': '104500', '140732589405952': '104501', '140732581013248': '104502', '140732572620544': '104503', '140732564227840': '104504', '140732555835136': '104505', '140732547442432': '104506', '140732539049728': '104507', '140732455188224': '104508', '140732446795520': '104509', '140732438402816': '104510', '140732430010112': '104511', '140732421617408': '104512', '140732413224704': '104513', '140732404832000': '104514', '140732396439296': '104515', '140732388046592': '104516', '140732379653888': '104517', '140732371261184': '104518', '140732362868480': '104519', '140732354475776': '104520', '140732346083072': '104521', '140732337690368': '104522', '140732329297664': '104523', '140732320904960': '104524', '140732312512256': '104525', '140732304119552': '104526', '140732295726848': '104527', '140732287334144': '104528', '140732278941440': '104529', '140732270548736': '104530', '140732262156032': '104531', '140732253763328': '104532', '140732245370624': '104533', '140732236977920': '104534', '140732228585216': '104535', '140732220192512': '104536', '140732211799808': '104537', '140732203407104': '104538'}
+start filtering!
+source file: events.log.temp
+target file: comb.log
+Analysis complete
+Number of 'racy' events found = 198
+Number of 'racy' lines found = 2
+Time for analysis = 146 milliseconds
+Racy events id: [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83, 84, 85, 86, 87, 88, 89, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99, 100, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112, 113, 114, 115, 116, 117, 118, 119, 120, 121, 122, 123, 124, 125, 126, 127, 128, 129, 130, 131, 132, 133, 134, 135, 136, 137, 138, 139, 140, 141, 142, 143, 144, 145, 146, 147, 148, 149, 150, 151, 152, 153, 154, 155, 156, 157, 158, 159, 160, 161, 162, 163, 164, 165, 166, 167, 168, 169, 170, 171, 172, 173, 174, 175, 176, 177, 178, 179, 180, 181, 182, 183, 184, 185, 186, 187, 188, 189, 190, 191, 192, 193, 194, 195, 196, 197, 198, 199]
+Racy lines: [4199781, 4199770]
+During Score Normalization: Max score is 0!
+started writing to JSON file
+finished writing to JSON file
+During Score Normalization: Max score is 0!
+[4199820|4199770, 4199834|4199781]
+[0.0, 0.0]
+length of the r/w list: 2
+[1;93m[!] [1;97mWARNING: [0mnew cov![0m
+[1;93m[!] [1;97mWARNING: [0minteresting schedule![0m
+[1;93m[!] [1;97mWARNING: [0minteresting schedule![0m
+[1;93m[!] [1;97mWARNING: [0minteresting schedule![0m
+[1;93m[!] [1;97mWARNING: [0minteresting schedule![0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;94m[*] [0mEntering queue cycle 2.[0m
+[1;94m[*] [0mFuzzing test case #0 (1 total, 2 uniq crashes found)...[0m
+{'140737347295232': '107215', '140737338590976': '107217', '140737330198272': '107218', '140737321805568': '107219', '140737313412864': '107220', '140737305020160': '107221', '140737296627456': '107222', '140736951482112': '107223', '140736943089408': '107224', '140736934696704': '107225', '140736926304000': '107226', '140736917911296': '107227', '140736909518592': '107228', '140736901125888': '107229', '140736347502336': '107230', '140736339109632': '107231', '140736330716928': '107232', '140736322324224': '107233', '140736313931520': '107234', '140736305538816': '107235', '140736297146112': '107236', '140735810631424': '107237', '140735802238720': '107238', '140735793846016': '107239', '140735785453312': '107240', '140735777060608': '107241', '140735768667904': '107242', '140735760275200': '107243', '140735273760512': '107244', '140735265367808': '107245', '140735256975104': '107246', '140735248582400': '107247', '140735240189696': '107248', '140735231796992': '107249', '140735223404288': '107250', '140734736889600': '107251', '140734728496896': '107252', '140734720104192': '107253', '140734711711488': '107254', '140734703318784': '107255', '140734694926080': '107256', '140734686533376': '107257', '140734200018688': '107258', '140734191625984': '107259', '140734183233280': '107260', '140734174840576': '107261', '140734166447872': '107262', '140734158055168': '107263', '140734149662464': '107264', '140733663147776': '107265', '140733654755072': '107266', '140733646362368': '107267', '140733637969664': '107268', '140733629576960': '107269', '140733621184256': '107270', '140733612791552': '107271', '140733126276864': '107272', '140733117884160': '107273', '140733109491456': '107274', '140733101098752': '107275', '140733092706048': '107276', '140733084313344': '107277', '140733075920640': '107278', '140732589405952': '107279', '140732581013248': '107280', '140732572620544': '107281', '140732564227840': '107282', '140732555835136': '107283', '140732547442432': '107284', '140732539049728': '107285', '140732455188224': '107286', '140732446795520': '107287', '140732438402816': '107288', '140732430010112': '107289', '140732421617408': '107290', '140732413224704': '107291', '140732404832000': '107292', '140732396439296': '107293', '140732388046592': '107294', '140732379653888': '107295', '140732371261184': '107296', '140732362868480': '107297', '140732354475776': '107298', '140732346083072': '107299', '140732337690368': '107300', '140732329297664': '107301', '140732320904960': '107302', '140732312512256': '107303', '140732304119552': '107304', '140732295726848': '107305', '140732287334144': '107306', '140732278941440': '107307', '140732270548736': '107308', '140732262156032': '107309', '140732253763328': '107310', '140732245370624': '107311', '140732236977920': '107312', '140732228585216': '107313', '140732220192512': '107314', '140732211799808': '107315', '140732203407104': '107316'}
+start filtering!
+source file: events.log.temp
+target file: comb.log
+Analysis complete
+Number of 'racy' events found = 200
+Number of 'racy' lines found = 5
+Time for analysis = 149 milliseconds
+Racy events id: [1, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83, 84, 85, 86, 87, 88, 89, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99, 100, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112, 113, 114, 115, 116, 117, 118, 119, 120, 121, 122, 123, 124, 125, 126, 127, 128, 129, 130, 131, 132, 133, 134, 135, 136, 137, 138, 139, 140, 141, 142, 143, 144, 145, 146, 147, 148, 149, 150, 151, 152, 153, 154, 155, 156, 157, 158, 159, 160, 161, 162, 163, 164, 165, 166, 167, 168, 169, 170, 171, 172, 173, 174, 175, 176, 177, 178, 179, 180, 181, 182, 183, 184, 185, 186, 187, 188, 189, 190, 191, 192, 193, 194, 195, 196, 197, 198, 199, 200, 201]
+Racy lines: [4199781, 4199862, 4199848, 4199770, 4199834]
+During Score Normalization: Max score is 0!
+started writing to JSON file
+finished writing to JSON file
+During Score Normalization: Max score is 0!
+[4199820|4199770, 4199834|4199781, 4199848|4199770, 4199862|4199781]
+[0.0, 0.0, 0.0, 0.0]
+length of the r/w list: 4
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;93m[!] [1;97mWARNING: [0minteresting schedule![0m
+[1;93m[!] [1;97mWARNING: [0mnew cov![0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;94m[*] [0mEntering queue cycle 3.[0m
+[1;94m[*] [0mFuzzing test case #0 (1 total, 5 uniq crashes found)...[0m
+[1;93m[!] [1;97mWARNING: [0minteresting schedule![0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;93m[!] [1;97mWARNING: [0minteresting schedule![0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;94m[*] [0mEntering queue cycle 4.[0m
+[1;94m[*] [0mFuzzing test case #0 (1 total, 11 uniq crashes found)...[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;94m[*] [0mEntering queue cycle 5.[0m
+[1;94m[*] [0mFuzzing test case #0 (1 total, 17 uniq crashes found)...[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;94m[*] [0mEntering queue cycle 6.[0m
+[1;94m[*] [0mFuzzing test case #0 (1 total, 21 uniq crashes found)...[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;94m[*] [0mEntering queue cycle 7.[0m
+[1;94m[*] [0mFuzzing test case #0 (1 total, 22 uniq crashes found)...[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;94m[*] [0mEntering queue cycle 8.[0m
+[1;94m[*] [0mFuzzing test case #0 (1 total, 26 uniq crashes found)...[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;94m[*] [0mEntering queue cycle 9.[0m
+[1;94m[*] [0mFuzzing test case #0 (1 total, 32 uniq crashes found)...[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;94m[*] [0mEntering queue cycle 10.[0m
+[1;94m[*] [0mFuzzing test case #0 (1 total, 39 uniq crashes found)...[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;94m[*] [0mEntering queue cycle 11.[0m
+[1;94m[*] [0mFuzzing test case #0 (1 total, 41 uniq crashes found)...[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;94m[*] [0mEntering queue cycle 12.[0m
+[1;94m[*] [0mFuzzing test case #0 (1 total, 46 uniq crashes found)...[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;94m[*] [0mEntering queue cycle 13.[0m
+[1;94m[*] [0mFuzzing test case #0 (1 total, 51 uniq crashes found)...[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;94m[*] [0mEntering queue cycle 14.[0m
+[1;94m[*] [0mFuzzing test case #0 (1 total, 54 uniq crashes found)...[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;94m[*] [0mEntering queue cycle 15.[0m
+[1;94m[*] [0mFuzzing test case #0 (1 total, 60 uniq crashes found)...[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;94m[*] [0mEntering queue cycle 16.[0m
+[1;94m[*] [0mFuzzing test case #0 (1 total, 65 uniq crashes found)...[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;94m[*] [0mEntering queue cycle 17.[0m
+[1;94m[*] [0mFuzzing test case #0 (1 total, 71 uniq crashes found)...[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;94m[*] [0mEntering queue cycle 18.[0m
+[1;94m[*] [0mFuzzing test case #0 (1 total, 77 uniq crashes found)...[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;94m[*] [0mEntering queue cycle 19.[0m
+[1;94m[*] [0mFuzzing test case #0 (1 total, 83 uniq crashes found)...[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;94m[*] [0mEntering queue cycle 20.[0m
+[1;94m[*] [0mFuzzing test case #0 (1 total, 87 uniq crashes found)...[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;94m[*] [0mEntering queue cycle 21.[0m
+[1;94m[*] [0mFuzzing test case #0 (1 total, 91 uniq crashes found)...[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;94m[*] [0mEntering queue cycle 22.[0m
+[1;94m[*] [0mFuzzing test case #0 (1 total, 95 uniq crashes found)...[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;94m[*] [0mEntering queue cycle 23.[0m
+[1;94m[*] [0mFuzzing test case #0 (1 total, 100 uniq crashes found)...[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;94m[*] [0mEntering queue cycle 24.[0m
+[1;94m[*] [0mFuzzing test case #0 (1 total, 100 uniq crashes found)...[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;94m[*] [0mEntering queue cycle 25.[0m
+[1;94m[*] [0mFuzzing test case #0 (1 total, 100 uniq crashes found)...[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;94m[*] [0mEntering queue cycle 26.[0m
+[1;94m[*] [0mFuzzing test case #0 (1 total, 100 uniq crashes found)...[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;94m[*] [0mEntering queue cycle 27.[0m
+[1;94m[*] [0mFuzzing test case #0 (1 total, 100 uniq crashes found)...[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;94m[*] [0mEntering queue cycle 28.[0m
+[1;94m[*] [0mFuzzing test case #0 (1 total, 100 uniq crashes found)...[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;94m[*] [0mEntering queue cycle 29.[0m
+[1;94m[*] [0mFuzzing test case #0 (1 total, 100 uniq crashes found)...[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;94m[*] [0mEntering queue cycle 30.[0m
+[1;94m[*] [0mFuzzing test case #0 (1 total, 100 uniq crashes found)...[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;94m[*] [0mEntering queue cycle 31.[0m
+[1;94m[*] [0mFuzzing test case #0 (1 total, 100 uniq crashes found)...[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;94m[*] [0mEntering queue cycle 32.[0m
+[1;94m[*] [0mFuzzing test case #0 (1 total, 100 uniq crashes found)...[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;94m[*] [0mEntering queue cycle 33.[0m
+[1;94m[*] [0mFuzzing test case #0 (1 total, 100 uniq crashes found)...[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;94m[*] [0mEntering queue cycle 34.[0m
+[1;94m[*] [0mFuzzing test case #0 (1 total, 100 uniq crashes found)...[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;94m[*] [0mEntering queue cycle 35.[0m
+[1;94m[*] [0mFuzzing test case #0 (1 total, 100 uniq crashes found)...[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;94m[*] [0mEntering queue cycle 36.[0m
+[1;94m[*] [0mFuzzing test case #0 (1 total, 100 uniq crashes found)...[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;94m[*] [0mEntering queue cycle 37.[0m
+[1;94m[*] [0mFuzzing test case #0 (1 total, 100 uniq crashes found)...[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;94m[*] [0mEntering queue cycle 38.[0m
+[1;94m[*] [0mFuzzing test case #0 (1 total, 100 uniq crashes found)...[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;94m[*] [0mEntering queue cycle 39.[0m
+[1;94m[*] [0mFuzzing test case #0 (1 total, 100 uniq crashes found)...[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;94m[*] [0mEntering queue cycle 40.[0m
+[1;94m[*] [0mFuzzing test case #0 (1 total, 100 uniq crashes found)...[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;94m[*] [0mEntering queue cycle 41.[0m
+[1;94m[*] [0mFuzzing test case #0 (1 total, 100 uniq crashes found)...[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;94m[*] [0mEntering queue cycle 42.[0m
+[1;94m[*] [0mFuzzing test case #0 (1 total, 100 uniq crashes found)...[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;94m[*] [0mEntering queue cycle 43.[0m
+[1;94m[*] [0mFuzzing test case #0 (1 total, 100 uniq crashes found)...[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;94m[*] [0mEntering queue cycle 44.[0m
+[1;94m[*] [0mFuzzing test case #0 (1 total, 100 uniq crashes found)...[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;94m[*] [0mEntering queue cycle 45.[0m
+[1;94m[*] [0mFuzzing test case #0 (1 total, 100 uniq crashes found)...[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;94m[*] [0mEntering queue cycle 46.[0m
+[1;94m[*] [0mFuzzing test case #0 (1 total, 100 uniq crashes found)...[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;94m[*] [0mEntering queue cycle 47.[0m
+[1;94m[*] [0mFuzzing test case #0 (1 total, 100 uniq crashes found)...[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;94m[*] [0mEntering queue cycle 48.[0m
+[1;94m[*] [0mFuzzing test case #0 (1 total, 100 uniq crashes found)...[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;94m[*] [0mEntering queue cycle 49.[0m
+[1;94m[*] [0mFuzzing test case #0 (1 total, 100 uniq crashes found)...[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;94m[*] [0mEntering queue cycle 50.[0m
+[1;94m[*] [0mFuzzing test case #0 (1 total, 100 uniq crashes found)...[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;94m[*] [0mEntering queue cycle 51.[0m
+[1;94m[*] [0mFuzzing test case #0 (1 total, 100 uniq crashes found)...[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;94m[*] [0mEntering queue cycle 52.[0m
+[1;94m[*] [0mFuzzing test case #0 (1 total, 100 uniq crashes found)...[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;94m[*] [0mEntering queue cycle 53.[0m
+[1;94m[*] [0mFuzzing test case #0 (1 total, 100 uniq crashes found)...[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;94m[*] [0mEntering queue cycle 54.[0m
+[1;94m[*] [0mFuzzing test case #0 (1 total, 100 uniq crashes found)...[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;94m[*] [0mEntering queue cycle 55.[0m
+[1;94m[*] [0mFuzzing test case #0 (1 total, 100 uniq crashes found)...[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;94m[*] [0mEntering queue cycle 56.[0m
+[1;94m[*] [0mFuzzing test case #0 (1 total, 100 uniq crashes found)...[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;94m[*] [0mEntering queue cycle 57.[0m
+[1;94m[*] [0mFuzzing test case #0 (1 total, 100 uniq crashes found)...[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;94m[*] [0mEntering queue cycle 58.[0m
+[1;94m[*] [0mFuzzing test case #0 (1 total, 100 uniq crashes found)...[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;94m[*] [0mEntering queue cycle 59.[0m
+[1;94m[*] [0mFuzzing test case #0 (1 total, 100 uniq crashes found)...[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;94m[*] [0mEntering queue cycle 60.[0m
+[1;94m[*] [0mFuzzing test case #0 (1 total, 100 uniq crashes found)...[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;94m[*] [0mEntering queue cycle 61.[0m
+[1;94m[*] [0mFuzzing test case #0 (1 total, 100 uniq crashes found)...[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;94m[*] [0mEntering queue cycle 62.[0m
+[1;94m[*] [0mFuzzing test case #0 (1 total, 100 uniq crashes found)...[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;94m[*] [0mEntering queue cycle 63.[0m
+[1;94m[*] [0mFuzzing test case #0 (1 total, 100 uniq crashes found)...[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;93m[!] [1;97mWARNING: [0mCRASHING Schedule[0m
+[1;94m[*] [0mEntering queue cycle 64.[0m
+[1;94m[*] [0mFuzzing test case #0 (1 total, 100 uniq crashes found)...[0m

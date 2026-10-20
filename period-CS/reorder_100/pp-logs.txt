@@ -1,0 +1,32 @@
+[*] Checking for the ability to compile x86 code...
+[+] Everything seems to be working, ready to compile.
+zig build-lib -lc -femit-h -fcompiler-rt mutator.zig
+cc -O3 -funroll-loops -Wall -D_FORTIFY_SOURCE=2 -g -Wno-pointer-sign -DAFL_PATH=\"/usr/local/lib/afl\" -DDOC_PATH=\"/usr/local/share/doc/afl\" -DBIN_PATH=\"/usr/local/bin\" afl-fuzz.c libmutator.a -o afl-fuzz -ldl -lrt
+[*] Testing the CC wrapper and instrumentation output...
+unset AFL_USE_ASAN AFL_USE_MSAN; AFL_QUIET=1 AFL_INST_RATIO=100 AFL_PATH=. ./afl-gcc -O3 -funroll-loops -Wall -D_FORTIFY_SOURCE=2 -g -Wno-pointer-sign -DAFL_PATH=\"/usr/local/lib/afl\" -DDOC_PATH=\"/usr/local/share/doc/afl\" -DBIN_PATH=\"/usr/local/bin\" test-instr.c -o test-instr -ldl
+./afl-showmap -m none -q -o .test-instr0 ./test-instr < /dev/null
+echo 1 | ./afl-showmap -m none -q -o .test-instr1 ./test-instr
+[+] All right, the instrumentation seems to be working!
+[+] LLVM users: see llvm_mode/README.llvm for a faster alternative to afl-gcc.
+[+] All done! Be sure to review README - it's pretty short and useful.
+gcc -fno-stack-protector -fpie -O2 -Wno-unused-function -mno-mmx -mno-sse -mno-avx -mno-avx2 -mno-avx512f -msoft-float -fno-tree-vectorize -fomit-frame-pointer -I examples/ -c -Wall -Wno-implicit-function-declaration -Wno-incompatible-pointer-types -Wno-int-conversion ./sched.c
+gcc sched.o -o sched -pie -nostdlib -Wl,-z -Wl,max-page-size=4096 -Wl,-z -Wl,norelro -Wl,-z -Wl,stack-size=0 -Wl,--export-dynamic -Wl,--entry=0x0 -Wl,--strip-all
+-----------------------------------------------
+mode                  = Linux ELF executable
+input_binary          = /workdir/PERIOD/evaluation/CS/reorder_100/reorder_100_bad
+output_binary         = reorder_100_bad.afl
+num_patched           = 126 / 127 (99.21%)
+num_patched_B1        = 55 / 127 (43.31%)
+num_patched_B2        = 36 / 127 (28.35%)
+num_patched_T1        = 34 / 127 (26.77%)
+num_patched_T2        = 0 / 127 (0.00%)
+num_patched_T3        = 1 / 127 (0.79%)
+num_virtual_mappings  = 61
+num_physical_mappings = 21 (34.43%)
+num_virtual_bytes     = 249856
+num_physical_bytes    = 86016 (34.43%)
+input_file_size       = 19312
+output_file_size      = 113816 (589.35%)
+time_elapsed          = 3ms
+memory_used           = 3420KB
+-----------------------------------------------
