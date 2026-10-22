@@ -1,12 +1,26 @@
-# Measurement semantics (record schema 6)
+# Measurement semantics (runner schema 7, worker schema 6)
 
-The runner copies and rebuilds `afl-fuzz.c`, `mutator.zig`, and `hive_metrics.h` from period-wip, then compiles hivemind.c. No Docker image rebuild is required. This changes the old behavior where AFL C edits were not copied. Use the same mounted-file runner command as before.
+The standalone runner copies and rebuilds `afl-fuzz.c`, `mutator.zig`, `hive_metrics.h`, and `libsched.cpp` from period-wip, then compiles hivemind.c. No Docker image rebuild is required. Use the same mounted-file runner command as before. The ablation controller builds once for all arms, archives the artifacts, and checks fingerprints before and after trials. See EXPERIMENT_RECORDS.md for the controlled comparison commands.
 
 ## Files
 
 Each worker writes atomic `hive_metrics.json` snapshots roughly once per second while making energy decisions or returning from schedule executions, plus a final snapshot on orderly shutdown. Long executions can delay publication. Each worker saves the first 1000 scored parents and every 1000th scored parent thereafter in `energy_decisions.jsonl`, including accepted and rejected parents. This is a systematic diagnostic sample, not a random or representative sample. Summary counters cover every decision.
 
 The runner writes `timeline.jsonl` once per second with the latest published worker snapshots, and retains each snapshot's age. Trial `record.json` has separate `at_stop_request` and final snapshots; grace-period activity can appear only in the latter. `measurement_complete` requires all worker metrics to have final=true. `budget_completed` alone does not certify complete telemetry or prove all workers stayed healthy throughout.
+
+## Runner schema 7
+
+Worker counters and the population_mean_v1 scoring policy remain at schema 6. Schema 7
+adds campaign build identity/verification and best-effort machine observations to the
+Python records. Trial start/finish and each timeline sample include machine data; missing
+fields are null. Container-visible host load, CPU ticks, memory, allowed CPUs, frequency
+policy reports and cgroup-v2 counters are observations, not controlled experimental inputs.
+The collector records its duration and adds read overhead. Frequency snapshots need not
+be exact hardware execution frequencies. CPU tick guest fields overlap user/nice fields.
+
+The controller defaults to ALL_RFF=1 explicitly and rejects trials with missing nonempty
+schedule feedback. Its four-replicate default balances arm positions and pairs seeds.
+This does not eliminate scheduler nondeterminism or establish bug-finding superiority.
 
 ## What is counted
 
@@ -22,6 +36,27 @@ The runner writes `timeline.jsonl` once per second with the latest published wor
 - Crash artifact counts are not unique bugs; crash_returns are execution outcomes, not replay-validated vulnerabilities.
 
 ## Frequency policy: population_mean_v1
+
+### Feedback identity: module_relative_stack_v2
+
+Mutex event contexts use a hash of ordered stack frames. Each frame is represented by the
+loaded module name and its code offset from that module's base. Absolute process addresses
+are excluded. This makes the identity comparable across AFL workers when ASLR relocates
+libsched or another shared object. Unresolved frames contribute only a fixed marker and
+their stack position; they never fall back to a randomized raw address. The stack buffer is
+automatic storage, removing the allocation leak in the previous helper.
+
+Instrumented memory events already receive their event ID from the instrumentation address.
+The current target and instrumented target are fixed-address executables; the module-relative
+change fixes mutex lock, trylock, and unlock contexts generated inside libsched. If future
+targets are PIE, their instrumented event IDs must receive the same cross-process stability
+test before comparison.
+
+The regression compiles the mounted libsched.cpp and calls the context function from two
+fixed call paths in eight fresh processes. It requires one stable identity per call path
+across all processes, repeated-call stability, and different identities for the two paths.
+This establishes identity behavior directly; benchmark ablations are still required to
+measure whether sharing improves exploration or bug discovery.
 
 Schema 6 changes scheduling in BOTH local and global frequency modes. Rerun the local
 baseline; schema 5 timings are historical context, not a comparison that isolates sharing.
@@ -92,7 +127,7 @@ replicated-worker energy/acceptance, both disagreement directions, the missed-th
 regression, empty populations, arithmetic boundaries, JSON sampling, concurrent process
 increments, all four feedback configurations, and all eight launcher configurations.
 Runner tests cover failures, shutdown, record preservation, no double-counting of global
-snapshots, matched ablation seeds/order, and stopping on incomplete measurements.
+snapshots, matched ablation seeds/order, reuse of one build across sixteen arms, locks, fingerprint drift, machine observations, and stopping on incomplete measurements or empty feedback. The local tests use dummy processes/artifacts; a container integration run is still required.
 
 ## Shutdown
 

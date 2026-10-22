@@ -39,6 +39,19 @@ static long number(const char *key, long fallback, long minimum) {
     return result;
 }
 
+static int run_command(const char *label, const char *command) {
+    int status = system(command);
+    if (status == -1) {
+        perror(label);
+        return -1;
+    }
+    if (!WIFEXITED(status) || WEXITSTATUS(status) != 0) {
+        fprintf(stderr, "%s failed with status %d\n", label, status);
+        return -1;
+    }
+    return 0;
+}
+
 int main() {
     printf("[*] Hive Mind Manager starting...\n");
 
@@ -91,37 +104,66 @@ int main() {
         }
         if (pids[i] == 0) {
             char worker_cwd[64];
-            sprintf(worker_cwd, "/opt/sched-fuzz_worker_%d", i);
+            int written = snprintf(worker_cwd, sizeof worker_cwd,
+                                   "/opt/sched-fuzz_worker_%d", i);
+            if (written < 0 || written >= (int)sizeof worker_cwd) {
+                fprintf(stderr, "Worker directory path too long\n");
+                _exit(1);
+            }
 
             char setup_cmd[2048];
-            sprintf(setup_cmd, "rm -rf %s && mkdir -p %s && ln -s /opt/sched-fuzz/afl-in %s/afl-in", 
-                    worker_cwd, worker_cwd, worker_cwd);
-            system(setup_cmd);
+            written = snprintf(setup_cmd, sizeof setup_cmd,
+                               "rm -rf %s && mkdir -p %s && "
+                               "ln -s /opt/sched-fuzz/afl-in %s/afl-in",
+                               worker_cwd, worker_cwd, worker_cwd);
+            if (written < 0 || written >= (int)sizeof setup_cmd) {
+                fprintf(stderr, "Worker setup command too long\n");
+                _exit(1);
+            }
+            if (run_command("worker setup", setup_cmd)) _exit(1);
 
             char sym_cmd[2048];
-            sprintf(sym_cmd, "ln -s /opt/sched-fuzz/out.csv %s/out.csv && "
-                             "ln -s /opt/sched-fuzz/events.log %s/events.log && "
-                             "ln -s /opt/sched-fuzz/mapping.log %s/mapping.log && "
-                             "ln -s /opt/sched-fuzz/comb.log %s/comb.log && "
-                             "ln -s /opt/sched-fuzz/event_pairs.json %s/event_pairs.json && "
-                             "ln -s /opt/sched-fuzz/all_pairs.json %s/all_pairs.json",
-                    worker_cwd, worker_cwd, worker_cwd, worker_cwd, worker_cwd, worker_cwd);
-            system(sym_cmd);
+            written = snprintf(sym_cmd, sizeof sym_cmd,
+                               "ln -s /opt/sched-fuzz/out.csv %s/out.csv && "
+                               "ln -s /opt/sched-fuzz/events.log %s/events.log && "
+                               "ln -s /opt/sched-fuzz/mapping.log %s/mapping.log && "
+                               "ln -s /opt/sched-fuzz/comb.log %s/comb.log && "
+                               "ln -s /opt/sched-fuzz/event_pairs.json %s/event_pairs.json && "
+                               "ln -s /opt/sched-fuzz/all_pairs.json %s/all_pairs.json",
+                               worker_cwd, worker_cwd, worker_cwd, worker_cwd,
+                               worker_cwd, worker_cwd);
+            if (written < 0 || written >= (int)sizeof sym_cmd) {
+                fprintf(stderr, "Worker symlink command too long\n");
+                _exit(1);
+            }
+            if (run_command("worker symlink setup", sym_cmd)) _exit(1);
 
-            chdir(worker_cwd);
+            if (chdir(worker_cwd)) {
+                perror("worker chdir");
+                _exit(1);
+            }
 
             setenv("AFL_PRELOAD", "/opt/sched-fuzz/libsched.so", 1);
 	    setenv("SCHEDULE", "./SCHEDULE", 1);
             if (use_shared) setenv("HIVEMIND_SHM", shm_name, 1);
             else unsetenv("HIVEMIND_SHM");
             
-            char seed_val[16];
-	    long trial_offset = seed_base;
-            sprintf(seed_val, "%ld", i + 1 + trial_offset);
+            char seed_val[32];
+            long trial_offset = seed_base;
+            written = snprintf(seed_val, sizeof seed_val, "%ld",
+                               i + 1 + trial_offset);
+            if (written < 0 || written >= (int)sizeof seed_val) {
+                fprintf(stderr, "Worker seed conversion failed\n");
+                _exit(1);
+            }
             setenv("SEED", seed_val, 1);
 
             char sync_id[32];
-            sprintf(sync_id, "worker_%d", i);
+            written = snprintf(sync_id, sizeof sync_id, "worker_%d", i);
+            if (written < 0 || written >= (int)sizeof sync_id) {
+                fprintf(stderr, "Worker sync id too long\n");
+                _exit(1);
+            }
 
             printf("[Worker %d] Launching AFL against: %s (CWD: %s)\n", i, target_binary, worker_cwd);
             

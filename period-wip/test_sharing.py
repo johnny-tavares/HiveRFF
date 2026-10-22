@@ -10,7 +10,8 @@ root = Path(__file__).resolve().parent
 source = Path(os.environ.get('AFL_SOURCE_DIR', '/opt/sched-fuzz/AFL-2.57b'))
 if not source.is_dir():
     source = root.parent / 'sched-fuzz/AFL-2.57b'
-if not (source / 'libmutator.a').is_file():
+mutator_library = Path(os.environ.get('HIVE_LIBMUTATOR', str(source / 'libmutator.a')))
+if not mutator_library.is_file():
     raise SystemExit('Build AFL first, or set AFL_SOURCE_DIR to its built source directory.')
 
 with tempfile.TemporaryDirectory(prefix='hive-sharing-test-') as temporary:
@@ -21,11 +22,24 @@ with tempfile.TemporaryDirectory(prefix='hive-sharing-test-') as temporary:
     for name in ['test_energy', 'test_sharing']:
         command = common + [str(root / (name + '.c'))]
         if name == 'test_sharing':
-            command += [str(source / 'libmutator.a')]
+            command += [str(mutator_library)]
         subprocess.run(command + ['-Wl,--gc-sections', '-o', str(work/name), '-lm', '-ldl', '-lrt'], check=True)
     subprocess.run(['gcc', '-Wall', '-Wextra', '-Werror', '-O2', str(root/'hivemind.c'),
                     str(root/'test_launcher.c'), '-Wl,--wrap=system,--wrap=chdir,--wrap=execv',
                     '-o', str(work/'test_launcher'), '-lrt'], check=True)
+    subprocess.run(['clang++', '-std=c++17', '-fPIC', '-shared', '-I', str(source.parent/'include'),
+                    '-I', str(source.parent), str(root/'libsched.cpp'), '-ldl', '-pthread', '-msse4.2',
+                    '-o', str(work/'libsched.so')], check=True)
+    subprocess.run(['gcc', '-Wall', '-Wextra', '-Werror', '-O0', '-fno-omit-frame-pointer',
+                    '-fno-pie', '-no-pie', str(root/'test_context_identity.c'), '-ldl',
+                    '-o', str(work/'test_context_identity')], check=True)
+    identities = []
+    for _ in range(8):
+        result = subprocess.run([str(work/'test_context_identity'), str(work/'libsched.so')],
+                                check=True, stdout=subprocess.PIPE, universal_newlines=True)
+        identities.append(tuple(map(int, result.stdout.split())))
+    assert len(set(identities)) == 1
+    assert identities[0][0] != identities[0][1]
     energy = work/'energy'; energy.mkdir()
     subprocess.run([str(work/'test_energy'), str(energy)], check=True)
     for line in (energy/'energy_decisions.jsonl').read_text().splitlines():
@@ -54,4 +68,4 @@ with tempfile.TemporaryDirectory(prefix='hive-sharing-test-') as temporary:
         invalid=dict(env); invalid[key]=value
         result=subprocess.run([str(work/'test_launcher')],env=invalid,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
         assert result.returncode != 0
-    print('PASS: scoring, JSON, all four process-sharing combinations, eight launch modes, invalid settings.')
+    print('PASS: stable cross-process event identities, distinct call sites, scoring, JSON, all four process-sharing combinations, eight launch modes, invalid settings.')

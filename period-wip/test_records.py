@@ -15,6 +15,7 @@ class Records(unittest.TestCase):
         r.FREQUENCY_MODE = 'global'
         r.NOVELTY_MODE = 'shared'
         r.AFL_SYNC = 'on'
+        r.ALL_RFF_MODE = 'inherit'
         r.SEED_BASE = 100
         r.NUM_TRIALS = 1
         r.WORKERS = 1
@@ -125,6 +126,21 @@ class Records(unittest.TestCase):
         result=r.run_trial(self.root, 1)
         self.assertEqual(result['status'], 'budget_completed')
         self.assertEqual(result['environment']['MASK'], '0x3FFF')
+        self.assertIn('collection_duration_ns', result['machine_before'])
+        self.assertIn('collection_duration_ns', result['machine_after'])
+        timeline = [json.loads(line) for line in (self.root/'trial-001/timeline.jsonl').read_text().splitlines()]
+        self.assertTrue(timeline)
+        self.assertIn('collection_duration_ns', timeline[0]['machine'])
+
+    def test_explicit_all_rff_overrides_inherited_environment(self):
+        from unittest.mock import patch
+        self.manager('time.sleep(10)\n')
+        with patch.dict(r.os.environ, {'ALL_RFF': '0'}):
+            r.configure_cli(['--all-rff', 'on'])
+            result = r.run_trial(self.root, 1)
+        self.assertEqual(result['environment']['ALL_RFF'], '1')
+        r.configure_cli(['--all-rff', 'off'])
+        self.assertEqual(r.trial_settings(1, self.root)['ALL_RFF'], '0')
     def test_setup_failure_record_and_legacy_preservation(self):
         r.OUT_ROOT=self.root/'out'
         legacy=r.OUT_ROOT/'worker_0'

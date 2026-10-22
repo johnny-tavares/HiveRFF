@@ -125,15 +125,42 @@ inline size_t hash_combine(uintptr_t lhs,  uintptr_t rhs)
 }
 
 
+static uintptr_t hash_string(const char *value) {
+#if UINTPTR_MAX == UINT64_MAX
+    uintptr_t hash = UINT64_C(14695981039346656037);
+    const uintptr_t prime = UINT64_C(1099511628211);
+#else
+    uintptr_t hash = UINT32_C(2166136261);
+    const uintptr_t prime = UINT32_C(16777619);
+#endif
+    if (value != nullptr) {
+        while (*value != '\0') {
+            hash ^= (unsigned char)*value++;
+            hash *= prime;
+        }
+    }
+    return hash;
+}
+
+/* A feedback identity must compare equal in different AFL worker processes.
+ * Absolute return addresses fail that requirement when ASLR relocates shared
+ * objects. Hash the module name and the address relative to its load base.
+ * Unresolved frames retain their position but never reintroduce a raw address.
+ */
 inline uintptr_t get_context_hash() {
-    void ** bt = (void**) malloc(sizeof(void*) * MAX_BT_LENGTH);
+    void *bt[MAX_BT_LENGTH];
     int len = backtrace(bt, MAX_BT_LENGTH);
-    // @TODO not stable across runs without ASLR -- switch to e9patch instrum
-    uintptr_t hash = (uintptr_t) bt[0];
-    int i = 1;
-    while (i < len) {
-        hash = hash_combine(hash, (uintptr_t) bt[i]);
-        i += 1;
+    uintptr_t hash = hash_string("hiverff-context-v2");
+    for (int i = 0; i < len; ++i) {
+        Dl_info info = {};
+        hash = hash_combine(hash, (uintptr_t)i);
+        if (dladdr(bt[i], &info) && info.dli_fbase != nullptr) {
+            uintptr_t offset = (uintptr_t)bt[i] - (uintptr_t)info.dli_fbase;
+            hash = hash_combine(hash, hash_string(info.dli_fname));
+            hash = hash_combine(hash, offset);
+        } else {
+            hash = hash_combine(hash, hash_string("unresolved-frame"));
+        }
     }
     return hash;
 }
@@ -1776,4 +1803,3 @@ int sigwait(const sigset_t *ss, int *restrict) {
 
     return 0;
 }
-
