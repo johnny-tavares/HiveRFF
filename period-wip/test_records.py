@@ -29,6 +29,33 @@ class Records(unittest.TestCase):
     def manager(self, behavior):
         self.fake.write_text('#!/usr/bin/env python3\nimport os, time\nfrom pathlib import Path\np=Path(os.environ["HIVE_OUTPUT_DIR"])/"worker_0"\np.mkdir()\n(p/"fuzzer_stats").write_text("start_time : 123\\nexecs_done : 7\\n")\n(p/"num_scheds.txt").write_text("7")\n'+behavior)
         self.fake.chmod(0o755)
+    def test_preprocessing_abort_is_failure(self):
+        r.MODE='THROUGHPUT'
+        self.manager('import signal, json\ndef stop(sig,frame):\n (p/"hive_metrics.json").write_text(json.dumps({"schema_version":11,"final":True,"pair_loads":0,"preprocess_failures":1}))\n raise SystemExit(0)\nsignal.signal(signal.SIGTERM,stop)\nprint("PROGRAM ABORT : preprocessing failed",flush=True)\ntime.sleep(10)\n')
+        result=r.run_trial(self.root,1)
+        self.assertEqual(result['status'],'failed')
+        self.assertFalse(result['preprocessing_complete'])
+
+    def test_manager_error_during_shutdown_is_failure(self):
+        r.MODE='THROUGHPUT'
+        self.manager('import signal, sys\nsignal.signal(signal.SIGTERM, lambda *_: sys.exit(7))\ntime.sleep(10)\n')
+        result=r.run_trial(self.root,1)
+        self.assertEqual(result['status'],'failed')
+        self.assertEqual(result['manager_returncode_after_stop'],7)
+
+    def test_preprocessing_tools_required(self):
+        from unittest.mock import patch
+        tool=self.root/'tool.py'
+        with patch.object(r,'preprocessing_tools',return_value=[tool]):
+            with self.assertRaisesRegex(RuntimeError,'preprocessing tool'):
+                r.validate_preprocessing_tools()
+            tool.write_text('fixture')
+            with patch.object(r.shutil,'which',return_value=None):
+                with self.assertRaisesRegex(RuntimeError,'executable'):
+                    r.validate_preprocessing_tools()
+            with patch.object(r.shutil,'which',return_value='/fixture/tool'):
+                r.validate_preprocessing_tools()
+
     def test_crash_preserved_across_trials(self):
         self.manager('(p/"crashes").mkdir()\n(p/"crashes"/"id:000000").write_text("crash")\ntime.sleep(10)\n')
         one=r.run_trial(self.root, 1)
@@ -39,7 +66,7 @@ class Records(unittest.TestCase):
         self.assertEqual(one['worker_seeds']['worker_0'], 101)
         self.assertIsNotNone(one['first_crash_observed_sec'])
     def test_timeout_retained(self):
-        self.manager('time.sleep(10)\n')
+        self.manager('import signal, sys\nsignal.signal(signal.SIGTERM, lambda *_: sys.exit(0))\ntime.sleep(10)\n')
         result=r.run_trial(self.root, 1)
         self.assertEqual(result['status'], 'timeout')
         self.assertIsNone(result['first_crash_observed_sec'])
@@ -55,7 +82,7 @@ class Records(unittest.TestCase):
         self.assertIsNone(result['legacy_mutations_generated'])
     def test_interrupt_is_saved(self):
         from unittest.mock import patch
-        self.manager('time.sleep(10)\n')
+        self.manager('import signal, sys\nsignal.signal(signal.SIGTERM, lambda *_: sys.exit(0))\ntime.sleep(10)\n')
         real_sleep = r.time.sleep
         calls = []
         def interrupt_once(seconds):
@@ -93,23 +120,25 @@ class Records(unittest.TestCase):
         for index in range(2):
             worker=self.root/('worker_%d'%index);worker.mkdir()
             (worker/'hive_metrics.json').write_text(json.dumps({
-                'schema_version':6, 'final':True,
+                'schema_version':10, 'final':True,
                 'local_frequency_observations':10, 'selected_frequency_observations':20,
                 'selected_frequency_trace_buckets':4,
-                'shared_rejections_local_policy_would_pass':index+1,
-                'shared_passes_local_policy_would_reject':0, 'frequency_decisions':5}))
+                'shared_downweights_local_would_full':index+1,
+                'shared_full_local_would_downweight':0, 'frequency_decisions':5}))
         snapshot=r.snapshot(self.root)
         self.assertEqual(snapshot['totals']['local_frequency_observations'],20)
-        self.assertEqual(snapshot['totals']['shared_rejections_local_policy_would_pass'],3)
+        self.assertEqual(snapshot['totals']['shared_downweights_local_would_full'],3)
         self.assertNotIn('selected_frequency_observations',snapshot['totals'])
         self.assertNotIn('selected_frequency_trace_buckets',snapshot['totals'])
 
     def test_diagnostic_environment_is_recorded(self):
         from unittest.mock import patch
-        self.manager('time.sleep(10)\n')
-        with patch.dict(r.os.environ, {'ALL_RFF':'1'}):
+        self.manager('import signal, sys\nsignal.signal(signal.SIGTERM, lambda *_: sys.exit(0))\ntime.sleep(10)\n')
+        with patch.dict(r.os.environ, {'ALL_RFF':'1','HIVE_PROFILE':'1'}):
             result=r.run_trial(self.root,1)
         self.assertEqual(result['environment']['ALL_RFF'],'1')
+        self.assertEqual(result['environment']['HIVE_PROFILE'],'1')
+        self.assertTrue(result['profiling']['enabled'])
 
     def test_shutdown_flush_is_retained(self):
         r.MODE='THROUGHPUT'
@@ -122,7 +151,7 @@ class Records(unittest.TestCase):
 
     def test_throughput_budget(self):
         r.MODE='THROUGHPUT'
-        self.manager('time.sleep(10)\n')
+        self.manager('import signal, sys\nsignal.signal(signal.SIGTERM, lambda *_: sys.exit(0))\ntime.sleep(10)\n')
         result=r.run_trial(self.root, 1)
         self.assertEqual(result['status'], 'budget_completed')
         self.assertEqual(result['environment']['MASK'], '0x3FFF')
@@ -134,7 +163,7 @@ class Records(unittest.TestCase):
 
     def test_explicit_all_rff_overrides_inherited_environment(self):
         from unittest.mock import patch
-        self.manager('time.sleep(10)\n')
+        self.manager('import signal, sys\nsignal.signal(signal.SIGTERM, lambda *_: sys.exit(0))\ntime.sleep(10)\n')
         with patch.dict(r.os.environ, {'ALL_RFF': '0'}):
             r.configure_cli(['--all-rff', 'on'])
             result = r.run_trial(self.root, 1)
@@ -178,7 +207,7 @@ class Records(unittest.TestCase):
         r.FREQUENCY_MODE = 'local'
         r.AFL_SYNC = 'off'
         r.OUT_ROOT = self.root / 'out'
-        self.manager('time.sleep(10)\n')
+        self.manager('import signal, sys\nsignal.signal(signal.SIGTERM, lambda *_: sys.exit(0))\ntime.sleep(10)\n')
         with patch.object(r, 'setup_environment'), patch.object(r, 'capture_provenance', return_value={}):
             r.main()
         manifest_path = next(r.OUT_ROOT.glob('experiments/*/experiment.json'))

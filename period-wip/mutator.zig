@@ -289,48 +289,48 @@ const SchedEvents = struct {
 };
 
 var READ_ITER: usize = 0;
-export fn read_rf_set(filename: [*c]const u8) bool {
+var LAST_RF_LOAD_PAIRS: u64 = 0;
+// -1: load failure; 0: valid data with no zero-scored relation; 1: has such a relation.
+// A valid empty file is success, with loaded_pairs == 0.
+export fn read_rf_set_checked(filename: [*c]const u8, loaded_pairs: *u64, available_pairs: *u64) c_int {
     READ_ITER += 1;
-    const fname = std.mem.span(filename);
-    var allocator = std.heap.c_allocator;
+    loaded_pairs.* = 0;
+    available_pairs.* = RF_CUM_SCORES.count();
+    const result = inner_read_rf_set2(std.mem.span(filename), std.heap.c_allocator) catch |err| {
+        std.debug.print("RF load failed for {s}: {s}\n", .{std.mem.span(filename), @errorName(err)});
+        return -1;
+    };
+    loaded_pairs.* = LAST_RF_LOAD_PAIRS;
+    available_pairs.* = RF_CUM_SCORES.count();
+    return if (result) 1 else 0;
+}
 
-    const r = inner_read_rf_set2(fname, allocator);
-
-    // dump_rf_set("cum-rf-set.json", RF_CUM_SCORES);
-    // const f = std.fmt.allocPrint(allocator, "rf-set-{}.json", .{READ_ITER}) catch @panic("OOM");
-    // defer allocator.free(f);
-
-    // const inf = std.fmt.allocPrintZ(allocator, "cp {s} inf-{}.json", .{ fname, READ_ITER }) catch @panic("OOM");
-    // defer allocator.destroy(inf);
-    // _ = c.system(inf);
-
-    // const clog = std.fmt.allocPrintZ(allocator, "cp events.log events-{}.log", .{READ_ITER}) catch @panic("OOM");
-    // defer allocator.destroy(clog);
-    // _ = c.system(clog);
-
-    // const slog = std.fmt.allocPrintZ(allocator, "cp SCHEDULE SCHEDULE-{}.sched", .{READ_ITER}) catch @panic("OOM");
-    // defer allocator.destroy(slog);
-    // _ = c.system(slog);
-
-    // dump_rf_set(f, RF_SCORES);
-    return r;
+export fn read_rf_set(filename: [*c]const u8) bool {
+    var loaded: u64 = 0;
+    var available: u64 = 0;
+    const result = read_rf_set_checked(filename, &loaded, &available);
+    if (result < 0) @panic("RF pair load failed");
+    return result == 1;
 }
 
 var CUM_SCORE: f32 = 0;
 var L2 = false;
-fn inner_read_rf_set2(filename: []const u8, allocator: std.mem.Allocator) bool {
-    var content = std.fs.cwd().readFileAlloc(allocator, filename, 10 * 1000 * 1000) catch |e| {
-        std.debug.print("FOPEN err on {s}: {}", .{ filename, e });
-        return false;
-    };
+fn inner_read_rf_set2(filename: []const u8, allocator: std.mem.Allocator) !bool {
+    const content = try std.fs.cwd().readFileAlloc(allocator, filename, 10 * 1000 * 1000);
     defer allocator.free(content);
 
     var has_race = false;
 
     const parse_options = std.json.ParseOptions{};
 
-    const parsed = std.json.parseFromSlice(SchedEvents, allocator, content, parse_options) catch @panic("parse err");
+    const parsed = try std.json.parseFromSlice(SchedEvents, allocator, content, parse_options);
     defer parsed.deinit();
+    if (parsed.value.rels.len != parsed.value.scores.len) return error.PairScoreLengthMismatch;
+    // Validate the whole file before changing cumulative state.
+    for (parsed.value.scores) |score| {
+        if (!std.math.isFinite(score) or score < 0 or score > 1) return error.InvalidPairScore;
+    }
+    LAST_RF_LOAD_PAIRS = parsed.value.rels.len;
 
     var i: u32 = 0;
     while (i < parsed.value.rels.len) {
@@ -427,7 +427,7 @@ test "smoke event set" {
     defer RF_SCORES.deinit();
     RF_CUM_SCORES = std.AutoArrayHashMap(ReadFrom, f32).init(allocator);
     defer RF_CUM_SCORES.deinit();
-    _ = inner_read_rf_set2("data.json", allocator);
+    _ = try inner_read_rf_set2("data.json", allocator);
 
     try std.testing.expect(RF_SCORES.values().len == 2);
     try std.testing.expect(RF_CUM_SCORES.values().len == 2);
@@ -969,7 +969,7 @@ test "scoring sampling event set" {
     RF_CUM_SCORES = std.AutoArrayHashMap(ReadFrom, f32).init(allocator);
     defer RF_CUM_SCORES.deinit();
 
-    _ = inner_read_rf_set2("example_event_pairs.json", allocator);
+    _ = try inner_read_rf_set2("example_event_pairs.json", allocator);
     const rf = weighted_sample(RF_CUM_SCORES);
     _ = rf;
     const rf1 = weighted_sample(RF_CUM_SCORES);

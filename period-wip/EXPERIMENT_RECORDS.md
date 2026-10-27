@@ -6,7 +6,7 @@ Run inside the existing container as before:
 python3 /opt/period-wip/run_hiverff.py
 ```
 
-The standalone runner recompiles the mounted manager, AFL C code, mutator, and scheduling runtime automatically, including hive_metrics.h and libsched.cpp. The ablation controller described below builds once and reuses that build for every arm. No Docker image rebuild is needed. See MEASUREMENT_SEMANTICS.md for runner schema 7, worker schema 6, and coordination counter definitions.
+The standalone runner recompiles the mounted manager, AFL C code, mutator, and scheduling runtime automatically, including hive_metrics.h and libsched.cpp. The ablation controller described below builds once and reuses that build for every arm. No Docker image rebuild is needed. See MEASUREMENT_SEMANTICS.md for runner schema 12, worker schema 11, and coordination counter definitions.
 
 Each invocation creates `/opt/out/experiments/<UTC timestamp>-<unique suffix>/` (the host's mounted `out/experiments/`):
 
@@ -18,7 +18,7 @@ Each invocation creates `/opt/out/experiments/<UTC timestamp>-<unique suffix>/` 
 
 Existing `out/worker_*` folders are preserved. No shared-memory-wide deletion or global process-name kill is performed. One runner at a time per container is required because worker scratch paths remain global. The output-root lock prevents simultaneous new runners sharing that output mount; do not run the old runner or a second runner with a different mount concurrently.
 
-Both SPEED and THROUGHPUT honor --trials (default 5); the manifest records the planned count. No success-only averages are produced. Outcomes include crash_found, timeout, budget_completed, failed, and interrupted. A running record after abrupt container termination indicates an unfinished run, not success. Missing counters are null, not zero. Machine observations are also stored at trial start, finish, and each timeline sample; see the schema 7 section below.
+Both SPEED and THROUGHPUT honor --trials (default 5); the manifest records the planned count. No success-only averages are produced. Outcomes include crash_found, timeout, budget_completed, failed, and interrupted. A running record after abrupt container termination indicates an unfinished run, not success. Missing counters are null, not zero. Machine observations are also stored at trial start, finish, and each timeline sample; see the machine-observations section below.
 
 The clock starts immediately before manager launch and includes worker startup. Crash timing is the first polling observation (50 ms polling interval plus scanning/scheduling overhead), not an exact crash timestamp. Final counters can include work completed during shutdown and are periodically published by AFL; they are not exact schedules-to-first-crash. Crash files are neither deduplicated nor independently validated bugs. Missing worker statistics flag a failed run, but this is not yet continuous worker health monitoring.
 
@@ -34,7 +34,7 @@ python3 /opt/period-wip/test_records.py
 
 Schema 2 adds worker hive_metrics.json, bounded energy_decisions.jsonl, and per-trial timeline.jsonl. The old total_schedules field is replaced by explicitly named mutation and execution counters. Check measurement_complete and per-worker final markers.
 
-## Sharing controls (schema 5)
+## Sharing controls
 
 Defaults: CS/twostage_20/twostage_20_bad, 16 workers, 120 seconds per trial,
 throughput mode, five trials, global frequency, shared novelty, AFL queue synchronization off.
@@ -80,7 +80,10 @@ the existing non-atomic implementation; this change does not solve simultaneous 
 experiment.json and trial records include sharing settings and seeds. Worker metrics report
 actual frequency_mode, novelty_mode, and afl_sync. Decision events use selected_frequency_count
 plus frequency_mode instead of the old global_bucket_count name, which was misleading for local mode.
-The cutoff uses matching observation totals and distinct-count populations in each mode. See MEASUREMENT_SEMANTICS.md for the changed energy rule.
+The reference mean uses matching observation totals and distinct-count populations in each
+mode. Traces at or below that mean keep their candidate energy. Hotter traces receive an
+blend of three parts full energy and one part `mean/count` proportional score, retaining at least 75% of
+their candidate. See MEASUREMENT_SEMANTICS.md for the exact rule and counters.
 
 `target_inputs/` preserves available target .c source, mempair input, and generated out.csv.
 Their hashes and the PERIOD Git commit are recorded under target_provenance. Missing files/revision
@@ -91,12 +94,14 @@ Local validation:
 python3 /opt/period-wip/test_records.py
 python3 /opt/period-wip/test_sharing.py
 ```
-The sharing tests compile against the existing AFL headers and libmutator.a and exercise
-cross-process frequency/novelty visibility, startup map preservation, scoring, JSON metrics,
-and all eight launcher combinations. Launcher wrappers suppress filesystem setup and AFL execution.
+The sharing tests compile against the existing AFL headers, build the mounted `mutator.zig`
+into a temporary library, and exercise cross-process frequency/novelty visibility, startup
+map preservation, scoring, JSON metrics, and all eight launcher combinations. An explicit
+`HIVE_LIBMUTATOR` remains available for host-only testing. Launcher wrappers suppress
+filesystem setup and AFL execution.
 A real benchmark run is still required for end-to-end confirmation.
 
-## Controlled comparison (runner schema 7, worker schema 6)
+## Controlled comparison (runner schema 12, worker schema 11)
 
 ### Stable cross-worker feedback identities
 
@@ -162,8 +167,8 @@ logs, copies of the runtime artifacts, target inputs, fingerprints, and a build 
 out/ablations/<timestamp-id>/build/. Every experiment points to this same build manifest.
 Before and after trials, it verifies runtime/source/target-input fingerprints and the seed
 corpus inventory. Unexpected changes stop the comparison. Setup runs once; AFL C, the
-mutator, and manager remain on frequency_policy=population_mean_v1. This update changes
-experiment control and observation, not the scoring policy.
+mutator, and manager remain on frequency_policy=guarded_frequency_energy_v4 for the
+whole campaign.
 
 Individual records remain under out/experiments. The controller's ablation.json links the
 runs to configurations and replicates. Every individual experiment has trial-001 because
@@ -186,15 +191,116 @@ included in user and nice; do not count them twice. Consult the
 [Linux CPU frequency documentation](https://docs.kernel.org/admin-guide/pm/cpufreq.html)
 and [cgroup v2 documentation](https://docs.kernel.org/admin-guide/cgroup-v2.html).
 
-The normalization fix changed both local and shared scheduling. Use all four arms with
-worker schema 6 and frequency_policy=population_mean_v1. Older schema 5 runs do not isolate
-sharing under the current policy. The earlier schema 6 campaign remains useful pilot data;
-use the new campaign to assess whether its throughput differences persist under one build
-and balanced run positions. Crash artifacts still require replay/validation before any
-claim about distinct bugs.
+The blended policy changes both local and shared scheduling. Use all four arms with worker
+schema 9 and frequency_policy=guarded_frequency_energy_v4. Worker schemas 6, 7 and 8 remain
+evidence about earlier policies and are not direct performance comparisons.
+Crash artifacts still require replay/validation before any claim about distinct bugs.
 
 Local harness tests (no real fuzzing):
 ```sh
 python3 /opt/period-wip/test_records.py
 python3 /opt/period-wip/test_ablation.py
 ```
+
+
+## Opt-in profiling (runner schema 12, worker schema 11)
+
+The scheduling policy remains guarded_frequency_energy_v4. Set `HIVE_PROFILE=1`
+for phase_timing_schedule_fingerprints_v1 diagnostics; unset it or use 0 for regular
+runs. Other values fail validation. Workers publish the actual enabled state, and
+runner records/builds/ablation manifests retain the requested profiling settings.
+
+```sh
+python3 /opt/period-wip/test_sharing.py &&
+HIVE_PROFILE=1 ALL_RFF=1 AFL_SKIP_CPUFREQ=1 python3 /opt/period-wip/run_ablation.py \
+  --seconds 60 --trials 1 --seed-base 10000
+# Use the ablation.json path printed by that run:
+python3 /opt/period-wip/analyze_profile.py /opt/out/ablations/<run>/ablation.json
+```
+
+Each worker's profile.jsonl logs parent scoring decisions and schedule execution
+outcomes, up to 100,000 combined rows. The cap does not stop timing counters.
+`profile_dropped_rows`, missing files, malformed records, and missing final metrics
+cause the analyzer to mark its overlap report incomplete. Capped overlap covers a
+prefix; it is not an estimate of full-run uniqueness. --json retains per-worker
+counts and selection concentration. The report can also accept trial record.json.
+
+Timing counters measure calls and monotonic nanoseconds for parent scoring,
+mutation generation, writing SCHEDULE, run_target (including interrupted calls),
+novelty checks, frequency-table updates, local diagnostic-table updates, and new
+profiling work. `target_parent_cpu` uses the fuzzer thread's CPU clock during
+run_target; it excludes CPU consumed by the target child and is nested inside
+`target_wall`. Low parent CPU with high target wall time does not distinguish child
+computation, instrumentation, OS scheduling, synchronization, or I/O. Selection
+includes existing telemetry publication, so profile flushing can overlap selection.
+These phases do not partition whole-run time: startup, replay, saving discoveries,
+AFL work, and uninstrumented paths remain outside them. Do not sum all timers into
+a wall-time total. All aggregated durations are worker time, not swarm elapsed time.
+
+Schedule fingerprints are 64-bit FNV-1a hashes of explicit little-endian fields:
+seed, delay, distribution, avoid-uninitialized-writes flag, positive/negative
+obligation lengths, and ordered read/write event IDs. Pointers and struct padding
+are excluded. shape_hash omits only the seed. Input content is fingerprinted too;
+overlap compares (input hash, schedule/shape/trace hash) within a single build.
+Parent hashes identify selected parent specifications. These are hash-based
+identities with possible collisions; they are not captured concrete interleavings.
+Event-ID comparability still depends on the existing instrumentation identity
+assumptions. Hashes across different builds must not be treated as equivalent.
+
+The analyzer reports the union and sum of worker-local distinct identities.
+Their difference measures redundant worker memberships, not execution time saved.
+Interrupted executions are excluded from overlap. Full schedule and shape overlap
+answer different questions; identical shape with different seeds is not an exact
+repeat of the schedule specification.
+
+Profiling adds clock reads, hashing, and buffered file I/O, and may perturb thread
+scheduling. The diagnostics timer captures new hashing/logging/flush work but does
+not account for all timing-probe overhead. Treat this as a diagnostic campaign,
+not direct proof of a throughput improvement over unprofiled runs.
+
+
+## Checked preprocessing (runner schema 12, worker schema 11)
+
+`preprocessing_policy=checked_worker_local_pairs_v1` fixes a missing relative
+all_event_pairs.py invocation that previously left workers without RF constraints.
+The runner checks Python, Java, the trace-conversion script, pair-generation script,
+and predictor JAR before building. Tool sources and predictor library JARs join the
+build fingerprints. all_event_pairs.py is now included in the mounted period-wip
+folder, independent of whether the Docker image contains that script.
+
+The fuzzer calls tools with argv arrays (no shell), using absolute script/JAR paths.
+It unsets LD_PRELOAD only in the subprocess. Logs and pair outputs are generated in
+each worker directory. The launcher links only immutable out.csv and seed input;
+it no longer links mutable log/pair files. Old outputs are removed before replay;
+missing files during cleanup are allowed, other removal failures abort. A replay
+fault, command nonzero exit/signal, missing tool, or invalid/missing pair file aborts
+the worker and records a preprocessing failure. The manager stops remaining workers
+when a worker fails. Runner status becomes failed for worker aborts or manager errors.
+
+The Zig loader returns separate status and counts. It validates JSON, matching
+relation/score lengths, and finite scores in [0,1] before modifying cumulative state.
+Valid empty data is allowed and explicitly reported. A missing or malformed file is
+never interpreted as an empty dataset. The compatibility read_rf_set function also
+aborts on load failure. Out-of-memory failures remain fatal.
+
+Worker metrics include preprocess_runs, preprocess_failures, pair_loads,
+pair_empty_loads, pair_last_count, and pair_available. The last two describe file
+records and cumulative worker-local unique pairs; do not sum them as global distinct
+pairs. `preprocessing_complete` requires each modern worker to complete a successful
+load without a failure. A valid empty load meets that condition; it does not prove
+constraint-guided exploration. Check pair_available and mutation_obligation_changes
+before interpreting an ablation as exercising structural mutations.
+
+Mutation counters compare generated specifications against their immediate parent:
+mutation_obligation_changes, mutation_seed_changes, mutation_flag_changes,
+mutation_unchanged, mutation_initial_schedules, mutation_with_obligations.
+Changes can overlap (e.g. both seed and constraints change); these are output changes,
+not attempted operator counts or observed execution coverage. They are collected even
+with HIVE_PROFILE=0. V4 scoring is unchanged.
+
+Validation: test_sharing.py builds the mounted Zig mutator and runs test_preprocess.py
+alongside existing identity/scoring/sharing/launcher checks. The new suite exercises
+real pair generation with fixture conversion/prediction tools, successful/empty loads,
+missing/malformed/mismatched/invalid-score data, no partial update on invalid data,
+structural mutation generation, command failure/signals, missing executables/tools,
+and isolated worker outputs. Full Java/target replay still requires the Docker smoke run.

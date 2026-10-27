@@ -597,52 +597,6 @@ static void locate_diffs(u8 *ptr1, u8 *ptr2, u32 len, s32 *first, s32 *last)
 #endif /* !IGNORE_FINDS */
 
 static char* preload;
-static void no_forkserver_exec_e(char** argv){
-
-    unsetenv("LD_PRELOAD");
-    system("rm events.log mapping.log comb.log event_pairs.json all_pairs.json");
-    setenv("LD_PRELOAD", getenv("AFL_PRELOAD"), 1);
-
-    pid_t child_pid;
-    int child_status;
-      
-    setenv("TO_LOG", "true", 1);
-    setenv("LOG_DIR", "events.log", 1);
-    setenv("LOG_DIR_MAP", "mapping.log", 1);
-
-    setenv("SCHEDULE", "SCHEDULE", 1);
-
-
-    // child_pid = fork();
-    // if(child_pid == 0) {
-    //     /* This is done by the child process. */
-    //     execvp(argv[0], argv);
-
-    //     /* If execv returns, it must have failed. */
-    //     printf("Unknown command\n");
-    //     exit(0);
-    // } else {
-    //      /* This is run by the parent.  Wait for the child
-    //         to terminate. */
-    //     pid_t tpid = -1;
-    //      while(tpid != child_pid){
-    //         tpid = wait(&child_status);
-    //      }
-    // }
-
-    unsetenv("TO_LOG");
-    unsetenv("LOG_DIR");
-    unsetenv("LOG_DIR_MAP");
-  
-
-    unsetenv("LD_PRELOAD");
-    system("python3 ../race_predictor/fuzz_preprocess.py events.log mapping.log comb.log");
-    if (ALL_PAIRS) {
-      system("python3 all_event_pairs.py");
-    }
-    char * cmd =  alloc_printf("java -cp ../race_predictor/rapid.jar:../race_predictor/lib/* Main -t comb.log -s event_pairs.json -sp %s -dp  %s -w true", SP, DP);    
-    system(cmd); 
-}
 
  /* Describe integer. Uses 12 cyclic static buffers for return values. The value
    returned should be five characters or less for all the integers we reasonably
@@ -5130,13 +5084,22 @@ EXP_ST u32 sched_fuzz_stuff(char **argv, struct sched_entry *sched, u8 *out_buf,
     hive_empty_sched_map_hash_ready = 1;
   }
 
+  uint64_t profile_write_start = HIVE_PROFILE_START();
   write_to_sched(sched);
+  HIVE_PROFILE_END(schedule_write,profile_write_start);
 
 
   u64 start_us = get_cur_time_us();
   uint64_t hive_exec_start = hive_now_ns();
   ++hive_started;
+  uint64_t profile_cpu_start = hive_profile_enabled ? hive_parent_cpu_ns() : 0;
+  uint64_t profile_target_start = HIVE_PROFILE_START();
   fault = run_target(argv, exec_tmout);
+  HIVE_PROFILE_END(target_wall,profile_target_start);
+  if (hive_profile_enabled) {
+    hive_profile_target_parent_cpu_ns += hive_parent_cpu_ns()-profile_cpu_start;
+    ++hive_profile_target_parent_cpu_calls;
+  }
   uint32_t outcome_trace_id = 0;
   if (stop_soon) {
     ++hive_interrupted;
@@ -5175,6 +5138,7 @@ EXP_ST u32 sched_fuzz_stuff(char **argv, struct sched_entry *sched, u8 *out_buf,
   if (fault != FAULT_NONE)
     return fault;
 
+  uint64_t profile_novelty_start = HIVE_PROFILE_START();
   u8 keeping_sched = 0;
   u8 keeping_cov = 0;
   if (!NO_AFL_COV) {
@@ -5184,9 +5148,14 @@ EXP_ST u32 sched_fuzz_stuff(char **argv, struct sched_entry *sched, u8 *out_buf,
       keeping_sched = has_new_bits(virgin_bits, MAP_SIZE, SCHED_MAP_SIZE);
   }
 
+  HIVE_PROFILE_END(novelty,profile_novelty_start);
   uint32_t sched_trace_id = outcome_trace_id;
+  uint64_t profile_frequency_start = HIVE_PROFILE_START();
   store_path_id(sched_trace_id);
+  HIVE_PROFILE_END(frequency_update,profile_frequency_start);
+  uint64_t profile_local_start = HIVE_PROFILE_START();
   hive_observe(sched_trace_id);
+  HIVE_PROFILE_END(local_observe,profile_local_start);
   sched->sched_trace_id = sched_trace_id;
 
   u8 keeping = keeping_cov || keeping_sched;
@@ -5264,9 +5233,6 @@ static u32 choose_block_len(u32 limit)
   return min_value + UR(MIN(max_value, limit) - min_value + 1);
 }
 
-u32 skip = 0;
-uint64_t adj = 1;
-
 static u32 calculate_sched_score(struct sched_entry *q) {
   ++hive_decisions;
   hive_publish(0);
@@ -5324,55 +5290,44 @@ static u32 calculate_sched_score(struct sched_entry *q) {
   perf_score = (u32) (stage_max * tmp);
 
   /* Compare a frequency with the mean of its own population. Neither
-     population includes calibration, replay, crash, timeout or interrupted runs. */
+     population includes calibration, replay, crash, timeout or interrupted runs.
+     Common traces receive a 75/25 blend of full and proportional energy. */
   uint64_t selected_observations = total_path_observations();
   uint64_t observed_paths = total_paths();
-  uint64_t u = hive_threshold(selected_observations, observed_paths, adj);
-  uint64_t local_u = hive_threshold(hive_frequency_observations, hive_used, adj);
+  uint64_t u = hive_threshold(selected_observations, observed_paths, 0);
+  uint64_t local_u = hive_threshold(hive_frequency_observations, hive_used, 0);
   u32 frequency = get_path_id_count(q->sched_trace_id);
   uint64_t local_frequency = hive_local_count(q->sched_trace_id);
-  int selected_pass = frequency <= u;
-  int own_local_pass = local_frequency <= local_u;
   u32 next_level = q->fuzz_level < 31 ? q->fuzz_level + 1 : 31;
-  /* The global population gates selection, not per-worker mutation batch size.
-     Using global u for energy too would dilute each worker's energy as the
-     number of identical workers grows. Keep the local energy scale in both modes. */
+  /* Build the batch on the worker-local scale, then weight it by the selected
+     population's relative frequency. Duplicating an otherwise identical worker
+     population preserves frequency/mean and therefore preserves this weight. */
   u32 candidate_energy = hive_energy(next_level, local_u, perf_score, stage_max);
-  uint64_t decision_adj = adj;
-  u32 same_candidate = 0;
+  u32 assigned_energy = hive_frequency_energy(candidate_energy, frequency, u);
+  u32 local_policy_energy = hive_frequency_energy(candidate_energy, local_frequency, local_u);
 
   ++hive_frequency_decisions;
-  if (hive_shared_enabled) {
-    if (!selected_pass && own_local_pass) ++hive_shared_reject_local_policy_pass;
-    if (selected_pass && !own_local_pass) ++hive_shared_pass_local_policy_reject;
-  }
-  if (selected_pass) {
-    q->fuzz_level = next_level;
-    skip = 0;
-    perf_score = candidate_energy;
+  hive_energy_before += candidate_energy;
+  hive_energy_after += assigned_energy;
+  hive_energy_removed += candidate_energy - assigned_energy;
+  if (!candidate_energy) {
+    ++hive_zero_other;
+  } else if (assigned_energy < candidate_energy) {
+    ++hive_downweighted;
   } else {
-    ++hive_rejected;
-    int same_threshold_pass = hive_shared_enabled && local_frequency <= u;
-    if (same_threshold_pass) {
-      ++hive_shared_only;
-      same_candidate = hive_energy(next_level, u, perf_score, stage_max);
-      same_candidate = MIN(same_candidate, stage_max > stage_cur ? stage_max - stage_cur : 0);
-      hive_candidate_budget += same_candidate;
-    } else {
-      ++hive_also_local;
-    }
-    perf_score = 0;
-    skip += 1;
-    if (skip >= sched_nondets) {
-      skip = 0;
-      if (adj < UINT64_MAX) ++adj;
-    }
+    ++hive_full_energy;
   }
+  if (hive_shared_enabled) {
+    if (assigned_energy < candidate_energy && local_policy_energy == candidate_energy)
+      ++hive_shared_downweight_local_full;
+    if (assigned_energy == candidate_energy && local_policy_energy < candidate_energy)
+      ++hive_shared_full_local_downweight;
+  }
+  q->fuzz_level = next_level;
   hive_decision_event(q->sched_trace_id, frequency, local_frequency,
-                      selected_observations, observed_paths, u, local_u, decision_adj,
-                      selected_pass, own_local_pass, perf_score, same_candidate);
-  if (!perf_score && selected_pass) ++hive_zero_other;
-  return perf_score;
+                      selected_observations, observed_paths, u, local_u,
+                      candidate_energy, local_policy_energy, assigned_energy);
+  return assigned_energy;
 }
 
 /* Calculate case desirability score to adjust the length of havoc fuzzing.
@@ -6908,20 +6863,33 @@ havoc_stage:
 
   struct sched_entry *sched_cur = queue_cur->scheds;
   write_to_testcase(orig_in, queue_cur->len);
+  uint64_t profile_input_hash = 0;
+  if (hive_profile_enabled) {
+    uint64_t begin=hive_now_ns();
+    profile_input_hash=hive_profile_input(orig_in,queue_cur->len);
+    HIVE_PROFILE_END(diagnostics,begin);
+  }
   while (stage_cur < stage_max && !stop_soon) {
+  uint64_t profile_selection_start = HIVE_PROFILE_START();
   const u32 LIMIT = calculate_sched_score(sched_cur);
+  HIVE_PROFILE_END(selection,profile_selection_start);
+  hive_profile_row("selection",sched_cur,NULL,profile_input_hash,LIMIT,0);
   u32 count = 0;
   while (count < LIMIT && stage_cur < stage_max && !stop_soon)
   {
     count += 1;
     stage_cur += 1;
 
+    uint64_t profile_mutation_start = HIVE_PROFILE_START();
     struct sched_entry *sched_new = sched_mutate(sched_cur);
+    HIVE_PROFILE_END(mutation,profile_mutation_start);
+    hive_mutation_observe(sched_cur, sched_new);
     ++hive_generated;
     if (SCHED_COUNTING) {
       write_num_scheds(out_dir);
     }
     u32 result = sched_fuzz_stuff(argv, sched_new, out_buf, len);
+    hive_profile_row("execution",sched_cur,sched_new,profile_input_hash,result,stop_soon != 0);
     if (stop_soon) goto abandon_entry;
 
     u8 save = 0;
@@ -6955,27 +6923,18 @@ havoc_stage:
       bool has_race = false;
       if (result == NOFAULT_COV_INTERESTING || first_sched == 1) {
 
-        system("rm events.log mapping.log comb.log event_pairs.json all_pairs.json");
-
+        hive_preprocess_cleanup();
         *log_indicator = true;
-        run_target(argv, exec_tmout);
+        u8 replay_fault = run_target(argv, exec_tmout);
         *log_indicator = false;
-
-        unsetenv("LD_PRELOAD");
-        system("python3 ../race_predictor/fuzz_preprocess.py events.log mapping.log comb.log");
-        if (ALL_PAIRS) {
-          system("python3 all_event_pairs.py");
+        if (stop_soon) goto abandon_entry;
+        if (replay_fault != FAULT_NONE) {
+          hive_preprocess_failed();
+          FATAL("Preprocessing replay failed with target fault %u", replay_fault);
         }
-        char * cmd =  alloc_printf("java -cp ../race_predictor/rapid.jar:../race_predictor/lib/* Main -t comb.log -s event_pairs.json -sp %s -dp  %s -w true", SP, DP);    
-        system(cmd); 
-        setenv("LD_PRELOAD", getenv("AFL_PRELOAD"), 1);
-
+        if (!hive_preprocess_pairs()) goto abandon_entry;
+        has_race = hive_load_pairs(ALL_PAIRS ? "all_pairs.json" : "event_pairs.json");
         first_sched = 0;
-        if (ALL_PAIRS) {
-          has_race = read_rf_set("all_pairs.json");
-        } else {
-          has_race = read_rf_set("event_pairs.json");
-        }
       }
 
       sched_save(sched_new, orig_in, queue_cur->len, result == FAULT_CRASH, has_race);
@@ -8769,6 +8728,7 @@ static void save_cmdline(u32 argc, char **argv)
 extern void init_hivemind_scoreboard(u8 *ptr);
 
 static void configure_hive_sharing(void) {
+  hive_profile_configure();
   const char *name = getenv("HIVEMIND_SHM");
   const char *frequency = getenv("HIVE_FREQUENCY_MODE");
   const char *novelty = getenv("HIVE_NOVELTY_MODE");

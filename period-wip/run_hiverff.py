@@ -39,7 +39,8 @@ MANAGER = "/opt/sched-fuzz/hivemind"
 POLL_SECONDS = 0.05
 SNAPSHOT_SECONDS = 1.0
 SHUTDOWN_GRACE_SECONDS = 5.0
-FREQUENCY_POLICY = "population_mean_v1"
+FREQUENCY_POLICY = "guarded_frequency_energy_v4"
+PREPROCESSING_POLICY = "checked_worker_local_pairs_v1"
 FEEDBACK_IDENTITY_POLICY = "module_relative_stack_v2"
 
 def utc_now():
@@ -124,12 +125,33 @@ def machine_snapshot(proc=Path('/proc'), sys=Path('/sys')):
     return result
 
 
+def profiling_settings():
+    return {'enabled': os.environ.get('HIVE_PROFILE', '0') == '1',
+            'policy': 'phase_timing_schedule_fingerprints_v1'}
+
+
 def preflight():
+    if os.environ.get('HIVE_PROFILE', '0') not in ('0', '1'):
+        raise RuntimeError('HIVE_PROFILE must be 0 or 1')
     pattern = read_optional('/proc/sys/kernel/core_pattern')
     if pattern and pattern.startswith('|'):
         raise RuntimeError("Host kernel.core_pattern pipes crashes to a handler. Before fuzzing, save its original value and run 'sudo sysctl -w kernel.core_pattern=core' on the host. Restore it after the session. No host setting has been changed.")
     if os.environ.get('NO_RFF') not in (None, '0'):
         raise RuntimeError('NO_RFF disables schedule feedback; unset it before this comparison.')
+
+
+def preprocessing_tools():
+    return [Path('/opt/race_predictor/fuzz_preprocess.py'),
+            Path('/opt/period-wip/all_event_pairs.py'), Path('/opt/race_predictor/rapid.jar')]
+
+
+def validate_preprocessing_tools():
+    for path in preprocessing_tools():
+        if not path.is_file() or not os.access(str(path), os.R_OK):
+            raise RuntimeError('Missing or unreadable preprocessing tool: ' + str(path))
+    for executable in ('python3', 'java'):
+        if not shutil.which(executable):
+            raise RuntimeError('Missing preprocessing executable: ' + executable)
 
 
 def source_fingerprints():
@@ -138,6 +160,8 @@ def source_fingerprints():
               ('hivemind.c','mutator.zig','hive_metrics.h','afl-fuzz.c','libsched.cpp')]
     paths += [Path('/opt/sched-fuzz/AFL-2.57b') / name for name in ('afl-fuzz.c','hive_metrics.h')]
     paths.append(Path('/opt/sched-fuzz/libsched.cpp'))
+    paths += preprocessing_tools()
+    paths += sorted(Path('/opt/race_predictor/lib').glob('*.jar'))
     return {str(path): fingerprint(path) for path in paths}
 
 
@@ -173,8 +197,8 @@ def prepare_build(directory):
         if fingerprint(copy) != expected:
             raise RuntimeError('Runtime changed while archiving: ' + path)
         copies[path] = str(copy.relative_to(directory))
-    build = {'schema_version': 7, 'target': TARGET_PROG, 'built_at': utc_now(),
-             'frequency_policy': FREQUENCY_POLICY, 'source_sha256': source_fingerprints(),
+    build = {'schema_version': 12, 'target': TARGET_PROG, 'built_at': utc_now(),
+             'frequency_policy': FREQUENCY_POLICY, 'preprocessing_policy': PREPROCESSING_POLICY, 'profiling': profiling_settings(), 'source_sha256': source_fingerprints(),
              'feedback_identity_policy': FEEDBACK_IDENTITY_POLICY,
              'runtime_sha256': runtime, 'input_sha256': inputs, 'seed_sha256': seeds,
              'archived_runtime': copies,
@@ -277,6 +301,7 @@ def trial_settings(number, output):
     return settings
 
 def setup_environment(log):
+    validate_preprocessing_tools()
     def run(*args, **kwargs):
         return subprocess.run(*args, stdout=log, stderr=subprocess.STDOUT, **kwargs)
     print("[*] Phase 1: Native Compilation & Instrumentation...")
@@ -349,16 +374,26 @@ def snapshot(output):
     complete = all(w["metrics"] and w["metrics"].get("final") for w in workers.values())
     counter_names = ("mutations_generated", "schedule_executions_started", "schedule_executions_completed",
                      "schedule_executions_interrupted", "crash_returns", "timeout_returns", "error_returns",
-                     "normal_returns", "completed_execution_wall_ns", "energy_decisions", "frequency_rejections",
-                     "shared_frequency_rejections_local_would_pass", "frequency_rejections_local_also_fails",
-                     "zero_energy_other", "same_threshold_candidate_mutation_budget",
+                     "normal_returns", "completed_execution_wall_ns", "energy_decisions",
+                     "frequency_downweighted_decisions", "frequency_full_energy_decisions",
+                     "frequency_candidate_energy",
+                     "frequency_assigned_energy", "frequency_energy_removed",
+                     "shared_downweights_local_would_full", "shared_full_local_would_downweight",
+                     "zero_energy_other",
                      "local_frequency_observations", "frequency_decisions",
-                     "shared_rejections_local_policy_would_pass", "shared_passes_local_policy_would_reject",
                      "code_novelty_returns", "rf_only_novelty_returns",
                      "worker_unique_completed_trace_hashes", "worker_unique_normal_trace_hashes",
                      "worker_unique_crash_trace_hashes", "worker_unique_timeout_trace_hashes",
                      "worker_unique_error_trace_hashes", "schedule_bitmap_empty_returns",
                      "schedule_bitmap_nonempty_returns")
+    counter_names += tuple('profile_' + phase + suffix
+                           for phase in ('selection','mutation','schedule_write','target_wall',
+                                         'target_parent_cpu','novelty','frequency_update','local_observe','diagnostics')
+                           for suffix in ('_ns','_calls'))
+    counter_names += ('profile_rows','profile_dropped_rows')
+    counter_names += ('preprocess_runs','preprocess_failures','pair_loads','pair_empty_loads',
+                      'mutation_obligation_changes','mutation_seed_changes','mutation_flag_changes',
+                      'mutation_unchanged','mutation_initial_schedules','mutation_with_obligations')
     totals = {}
     for key in counter_names:
         values = [w["metrics"].get(key) if w["metrics"] else None for w in workers.values()]
@@ -396,9 +431,9 @@ def run_trial(experiment, number):
     # Record relevant inherited overrides without dumping unrelated secrets.
     effective = {k: v for k, v in env.items() if k.startswith("AFL_") or k in
                  set(settings) | {"MASK", "SEED", "LD_PRELOAD", "SCHEDULE", "HIVEMIND_SHM",
-                                  "ALL_RFF", "RECORD_EXACT_RFS"}}
-    record = {"schema_version": 7, "trial": number, "mode": MODE,
-              "status": "running", "started_at": utc_now(), "sharing": sharing_settings(), "frequency_policy": FREQUENCY_POLICY,
+                                  "ALL_RFF", "RECORD_EXACT_RFS", "HIVE_PROFILE"}}
+    record = {"schema_version": 12, "trial": number, "mode": MODE,
+              "status": "running", "started_at": utc_now(), "sharing": sharing_settings(), "frequency_policy": FREQUENCY_POLICY, "preprocessing_policy": PREPROCESSING_POLICY, "profiling": profiling_settings(),
               "feedback_identity_policy": FEEDBACK_IDENTITY_POLICY,
               "time_budget_sec": TIME_BUDGET, "environment": effective,
               "worker_seeds": {f"worker_{i}": i + 1 + worker_seed_base(number) for i in range(WORKERS)},
@@ -412,15 +447,16 @@ def run_trial(experiment, number):
                   "schedule_executions_completed": "run_target returned without shutdown requested, within sched_fuzz_stuff; includes normal, crash, timeout and error outcomes. Excludes calibration/replay executions.",
                   "worker_unique_outcome_trace_hashes": "Distinct schedule-map hashes observed by each worker, split by outcome. Trial totals sum worker-local cardinalities and can count the same hash once per worker; hashes are not exact schedule identities.",
                   "schedule_bitmap_empty_returns": "Completed schedule executions whose schedule-map hash equals the hash of an all-zero schedule bitmap. Nonempty returns are counted separately; hash collisions are theoretically possible.",
-                  "shared_frequency_rejections_local_would_pass": "Observed global bucket count exceeds the current threshold while this worker's own trace-hash count does not. Same-threshold diagnostic; not a standalone-worker counterfactual. Global bucket/hash collisions may contribute.",
-                  "same_threshold_candidate_mutation_budget": "Sum of hypothetical local-count energy at those rejection decisions, capped by remaining stage budget. Not actual mutations saved: early discoveries can shorten batches and parents may be revisited.",
-                  "frequency_policy": "population_mean_v1: frequency cutoff=floor(normal schedule observations/distinct traces)+adjustment, all from the selected local/global population. Energy uses the worker-local threshold in both modes. Both modes changed from schema 5; rerun the local baseline.",
+                  "frequency_policy": "guarded_frequency_energy_v4: build candidate batch energy on the worker-local scale. Traces at or below the selected population mean keep full energy; hotter traces receive ceil(candidate*(3+mean/count)/4), retaining at least 75% of the candidate.",
                   "population_snapshots": "selected_frequency_observations and selected_frequency_trace_buckets are global when frequency=global; do not sum them across workers. Live atomic fields can be briefly inconsistent. Local mode has no global population. Global distinct traces are occupied modulo buckets.",
-                  "shared_rejections_local_policy_would_pass": "Global cutoff rejects but local frequency passes the worker-local threshold. Observed parent, history and adjustment are held fixed; not an independent local run or time saved.",
-                  "shared_passes_local_policy_would_reject": "Global cutoff passes but local frequency exceeds the worker-local threshold; same observed-history limitation.",
-                  "decision_events": "First 1000 scored parents, then every 1000th, including accepted and rejected decisions. Systematic diagnostic sample, not random. Totals cover all decisions.",
+                  "frequency_energy": "Candidate, assigned and removed energy are scheduler scores before outer-loop early termination, not executed mutation counts. Frequency weighting never removes more than 25% of a nonzero candidate.",
+                  "shared_downweights_local_would_full": "The global population reduces energy while the worker-local population would grant the full candidate. This is an observed-history diagnostic, not an independent local-run counterfactual.",
+                  "shared_full_local_would_downweight": "The global population grants full energy while the worker-local population would reduce it; same observed-history limitation.",
+                  "decision_events": "First 1000 scored parents, then every 1000th. Events include candidate, local-policy and assigned energy. This is a systematic diagnostic sample, not random. Totals cover all decisions.",
                   "machine_conditions": "Best-effort container-visible /proc and /sys observations at start, each timeline sample, and finish. Missing fields are null. Load/CPU ticks may describe the whole host; cpufreq values are driver-reported snapshots, not exact execution frequencies. Cgroup fields refer to the runner cgroup when accessible. Observation duration and sampled reads add some measurement overhead; no machine settings are changed.",
                   "time_saved": "Not measured. completed_execution_wall_ns sums worker execution durations, not swarm wall time saved.",
+                  "preprocessing": "checked_worker_local_pairs_v1: absolute tool paths, checked subprocesses and validated pair loads. pair_last_count is file record count; pair_available is worker-local cumulative unique pair count (do not sum as global distinct). Valid empty loads are counted separately from failures. Mutation counters compare output specification with parent: obligation, seed and flag changes can overlap; they are not counts of attempted mutation operators.",
+                  "profiling": "HIVE_PROFILE=1 enables phase_timing_schedule_fingerprints_v1. Phase timers are elapsed worker time, not swarm wall time. Target parent CPU excludes child CPU; it is a subset of target wall time. Selection includes metric publication and may overlap diagnostics flush time. profile.jsonl contains up to 100000 selection/execution rows per worker; dropped rows make overlap statistics prefix-only. 64-bit schedule hashes identify specifications including seed, not realized interleavings. shape_hash excludes seed. Compare input+schedule hashes across workers within one build only.",
                   "final_totals": "May include shutdown-grace activity. Use at_stop_request and timeline.jsonl for periodic observations before shutdown. Check final flags and snapshot ages."},
               "crash_count_definition": "Artifact files, not deduplicated or validated bugs."}
     save_json(directory / "record.json", record)
@@ -476,6 +512,13 @@ def run_trial(experiment, number):
         record["measurement_complete"] = record["all_worker_metrics_final"]
         if not record["measurement_complete"]:
             record["measurement_warning"] = "Some workers did not publish final metrics; retained snapshots may be stale or incomplete."
+        modern_metrics = [w['metrics'] for w in record['workers'].values()
+                          if w['metrics'] and w['metrics'].get('schema_version',0)>=11]
+        record['preprocessing_complete'] = (all(m.get('pair_loads',0)>0 and m.get('preprocess_failures',0)==0
+                                               for m in modern_metrics)
+                                            if len(modern_metrics)==WORKERS else None)
+        if record['preprocessing_complete'] is False and record['status'] in ('timeout','budget_completed'):
+            record.update(status='failed',error='Worker preprocessing did not complete successfully.')
         log_path = directory / "console.log"
         if log_path.exists():
             text = re.sub(r"\x1b\[[0-9;?]*[A-Za-z]", "", log_path.read_text(errors="replace"))
@@ -483,8 +526,18 @@ def run_trial(experiment, number):
         record["missing_worker_stats"] = [k for k, v in record["workers"].items() if not v["fuzzer_stats"]]
         if record["missing_worker_stats"] and record["status"] in ("timeout", "budget_completed"):
             record.update(status="failed", error="One or more workers produced no fuzzer_stats; inspect console.log.")
+        if record.get('worker_abort_reasons') or (record['status'] in ('timeout','budget_completed') and record.get('manager_returncode_after_stop') not in (None,0)):
+            record.update(status='failed', error='Worker or manager failed; inspect console.log.')
         save_json(directory / "record.json", record)
     print(f"Trial {number}: {record['status']} — {directory}")
+    if record.get('preprocessing_complete') is not None:
+        available = [w['metrics']['pair_available'] for w in record['workers'].values()
+                     if w['metrics'] and 'pair_available' in w['metrics']]
+        if available:
+            changes = record['totals'].get('mutation_obligation_changes')
+            print(f"  RF pairs per worker: {min(available)}–{max(available)}; "
+                  f"workers with zero pairs: {sum(n == 0 for n in available)}; "
+                  f"generated schedules with changed obligations: {changes}")
     for reason in record.get("worker_abort_reasons", []):
         print(f"  Worker error: {reason}")
     if not record["measurement_complete"]:
@@ -510,10 +563,10 @@ def run_experiment(prepared=None):
     experiment = OUT_ROOT / "experiments" / name
     experiment.mkdir(parents=True)
     planned = NUM_TRIALS
-    manifest = {"schema_version": 7, "status": "setting_up", "started_at": utc_now(),
+    manifest = {"schema_version": 12, "status": "setting_up", "started_at": utc_now(),
                 "target": TARGET_PROG, "mode": MODE, "workers": WORKERS,
                 "time_budget_sec": TIME_BUDGET, "planned_trials": planned,
-                "configured_num_trials": NUM_TRIALS, "sharing": sharing_settings(), "frequency_policy": FREQUENCY_POLICY, "seed_base": SEED_BASE,
+                "configured_num_trials": NUM_TRIALS, "sharing": sharing_settings(), "frequency_policy": FREQUENCY_POLICY, "preprocessing_policy": PREPROCESSING_POLICY, "profiling": profiling_settings(), "seed_base": SEED_BASE,
                 "feedback_identity_policy": FEEDBACK_IDENTITY_POLICY,
                 "source_sha256": {}, "trials": []}
     manifest["source_sha256"] = source_fingerprints()

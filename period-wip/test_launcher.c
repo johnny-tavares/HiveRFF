@@ -4,7 +4,12 @@
 #include <string.h>
 #include <stdio.h>
 #include <unistd.h>
-int __wrap_system(const char *command) { (void)command; return 0; }
+int __wrap_system(const char *command) {
+  /* Worker-generated logs and pair files must never be linked to shared files. */
+  assert(!strstr(command,"events.log") && !strstr(command,"mapping.log"));
+  assert(!strstr(command,"comb.log") && !strstr(command,"pairs.json"));
+  return 0;
+}
 int __wrap_chdir(const char *path) { (void)path; return 0; }
 int __wrap_execv(const char *path, char *const args[]) {
   assert(!strcmp(path, "/opt/sched-fuzz/AFL-2.57b/afl-fuzz"));
@@ -20,5 +25,9 @@ int __wrap_execv(const char *path, char *const args[]) {
   }
   assert(saw_output && saw_sync == sync);
   assert(saw_skip == !sync); /* Exactly one -d without sync; never -S plus -d. */
+  if (getenv("TEST_FAIL_WORKER")) {
+    if (seed==402) _exit(7);
+    for (;;) pause();
+  }
   _exit(0);
 }

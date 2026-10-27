@@ -122,16 +122,11 @@ int main() {
             }
             if (run_command("worker setup", setup_cmd)) _exit(1);
 
+            /* Only immutable instrumentation input is shared. Replays and pair
+               generation create fresh files in this worker's directory. */
             char sym_cmd[2048];
             written = snprintf(sym_cmd, sizeof sym_cmd,
-                               "ln -s /opt/sched-fuzz/out.csv %s/out.csv && "
-                               "ln -s /opt/sched-fuzz/events.log %s/events.log && "
-                               "ln -s /opt/sched-fuzz/mapping.log %s/mapping.log && "
-                               "ln -s /opt/sched-fuzz/comb.log %s/comb.log && "
-                               "ln -s /opt/sched-fuzz/event_pairs.json %s/event_pairs.json && "
-                               "ln -s /opt/sched-fuzz/all_pairs.json %s/all_pairs.json",
-                               worker_cwd, worker_cwd, worker_cwd, worker_cwd,
-                               worker_cwd, worker_cwd);
+                               "ln -s /opt/sched-fuzz/out.csv %s/out.csv", worker_cwd);
             if (written < 0 || written >= (int)sizeof sym_cmd) {
                 fprintf(stderr, "Worker symlink command too long\n");
                 _exit(1);
@@ -196,11 +191,19 @@ int main() {
     signal(SIGTERM, request_stop);
     signal(SIGINT, request_stop);
     int failed = 0;
-    for (int i = 0; i < workers; i++) {
+    for (int remaining = workers; remaining > 0; --remaining) {
         int status;
         pid_t result;
-        do { result = waitpid(pids[i], &status, 0); } while (result < 0 && errno == EINTR);
-        if (result < 0 || !WIFEXITED(status) || WEXITSTATUS(status) != 0) failed = 1;
+        do { result = waitpid(-1, &status, 0); } while (result < 0 && errno == EINTR);
+        for (int i=0; i<workers; ++i) if (pids[i] == result) pids[i] = 0;
+        if (result < 0 || !WIFEXITED(status) || WEXITSTATUS(status) != 0) {
+            if (!failed) {
+                fprintf(stderr, "Worker failed; stopping remaining workers\n");
+                for (int i=0; i<workers; ++i) if (pids[i]>0) kill(pids[i],SIGTERM);
+            }
+            failed = 1;
+        }
+        if (result < 0) break;
     }
 
     if (use_shared) { munmap(base_addr, SHM_SIZE); shm_unlink(shm_name); }

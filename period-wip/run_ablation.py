@@ -49,8 +49,10 @@ def main(argv=None):
         return 0
     destination = runner.OUT_ROOT / 'ablations' / (datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ') + '-' + uuid.uuid4().hex[:8])
     destination.mkdir(parents=True)
-    manifest = {'schema_version': 7, 'frequency_policy': runner.FREQUENCY_POLICY,
+    manifest = {'schema_version': 12, 'frequency_policy': runner.FREQUENCY_POLICY,
                 'feedback_identity_policy': runner.FEEDBACK_IDENTITY_POLICY,
+                'preprocessing_policy': runner.PREPROCESSING_POLICY,
+                'profiling': runner.profiling_settings(),
                 'status': 'setting_up', 'settings': vars(args), 'runs': [],
                 'build_strategy': 'once_per_ablation', 'machine_before': runner.machine_snapshot()}
     record = destination / 'ablation.json'
