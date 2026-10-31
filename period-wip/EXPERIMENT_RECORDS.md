@@ -6,7 +6,7 @@ Run inside the existing container as before:
 python3 /opt/period-wip/run_hiverff.py
 ```
 
-The standalone runner recompiles the mounted manager, AFL C code, mutator, and scheduling runtime automatically, including hive_metrics.h and libsched.cpp. The ablation controller described below builds once and reuses that build for every arm. No Docker image rebuild is needed. See MEASUREMENT_SEMANTICS.md for runner schema 12, worker schema 11, and coordination counter definitions.
+The standalone runner recompiles the mounted manager, AFL C code, mutator, and scheduling runtime automatically, including hive_metrics.h and libsched.cpp. The ablation controller described below builds once and reuses that build for every arm. No Docker image rebuild is needed. See MEASUREMENT_SEMANTICS.md for runner schema 13, worker schema 11, and coordination counter definitions.
 
 Each invocation creates `/opt/out/experiments/<UTC timestamp>-<unique suffix>/` (the host's mounted `out/experiments/`):
 
@@ -101,7 +101,7 @@ map preservation, scoring, JSON metrics, and all eight launcher combinations. An
 filesystem setup and AFL execution.
 A real benchmark run is still required for end-to-end confirmation.
 
-## Controlled comparison (runner schema 12, worker schema 11)
+## Controlled comparison (runner schema 13, worker schema 11)
 
 ### Stable cross-worker feedback identities
 
@@ -203,7 +203,7 @@ python3 /opt/period-wip/test_ablation.py
 ```
 
 
-## Opt-in profiling (runner schema 12, worker schema 11)
+## Opt-in profiling (runner schema 13, worker schema 11)
 
 The scheduling policy remains guarded_frequency_energy_v4. Set `HIVE_PROFILE=1`
 for phase_timing_schedule_fingerprints_v1 diagnostics; unset it or use 0 for regular
@@ -259,7 +259,7 @@ not account for all timing-probe overhead. Treat this as a diagnostic campaign,
 not direct proof of a throughput improvement over unprofiled runs.
 
 
-## Checked preprocessing (runner schema 12, worker schema 11)
+## Checked preprocessing (runner schema 13, worker schema 11)
 
 `preprocessing_policy=checked_worker_local_pairs_v1` fixes a missing relative
 all_event_pairs.py invocation that previously left workers without RF constraints.
@@ -304,3 +304,64 @@ real pair generation with fixture conversion/prediction tools, successful/empty 
 missing/malformed/mismatched/invalid-score data, no partial update on invalid data,
 structural mutation generation, command failure/signals, missing executables/tools,
 and isolated worker outputs. Full Java/target replay still requires the Docker smoke run.
+
+## Post-run crash replay and CPU configuration audit (schema 13)
+
+Keep the power source and CPU configuration consistent for the entire campaign.
+The runner now audits sampled CPU maximum/minimum limits, governor, driver, allowed
+CPUs, and cgroup CPU quota/cpuset. Instantaneous frequency changes are excluded.
+`machine_configuration_audit` is saved in each trial and in the campaign manifest.
+Changes flag the comparison and print a warning; fuzzing continues and metrics are
+retained. `stable_observed` only covers available sampled fields, not thermal or
+background-load stability. Unavailable information is explicit in the audit.
+
+Enable a bounded replay sample after **all** timed trials:
+
+```sh
+HIVE_PROFILE=1 ALL_RFF=1 AFL_SKIP_CPUFREQ=1 \
+python3 /opt/period-wip/run_ablation.py \
+  --seconds 300 --trials 4 --seed-base 14000 \
+  --replay-crashes 16 --replay-attempts 3 --replay-timeout 8
+```
+
+This adds up to 768 replay executions after 80 minutes of trial budgets. Actual
+replay time depends on target runtime and failures; it is excluded from fuzzing
+budgets. Sampling rotates across workers and uses deterministic hash order within
+each worker. Sixteen cases per trial normally means one case per worker with saved
+crashes. Default `--replay-crashes 0` leaves replay disabled.
+
+The printed `replay-<timestamp>-<id>/report.json` contains per-attempt return codes,
+bounded stdout/stderr, reproduction counts, input/schedule hashes, and diagnostic
+signature groups by trial and sharing mode. Assertions retain file/line/expression;
+sanitizer signatures retain stack module offsets while removing volatile process
+IDs and instruction addresses. Signals without diagnostic evidence stay unclassified.
+Normal returns, timeouts, loader errors, incomplete output, and nonzero exits are
+reported separately. These groups are **not distinct-bug counts**.
+
+To replay a completed campaign separately, pass its exact ablation.json path to
+`python3 /opt/period-wip/replay_crashes.py`, optionally adding `--max-per-trial 16
+--attempts 3 --timeout 8`. A maximum of zero selects all saved schedules. Replay
+must run before another build replaces its binaries: it verifies target and
+libsched hashes at their original paths, holds the experiment lock, and never
+restores or overwrites live binaries. Path preservation matters because context
+identities include full module paths. Queue bytes are paired with each schedule's
+queue ID and passed on stdin, matching the current no-arguments launcher. Missing
+or ambiguous input causes a recorded skip, never a substituted seed.
+
+Each attempt uses a fresh temporary directory, disables core files, and kills its
+process group on timeout. Output retained in the report is bounded to 64 KiB per
+stream; truncated output is marked incomplete. Replay does not inherit AFL shared
+memory or live scheduler state. Relevant target/scheduler settings are copied
+from the recorded environment. System libraries are not archived, and standalone
+sequential replay can differ from a forkserver running under worker contention.
+
+The fuzzer saves at most 100 crash schedules per worker. Replay therefore samples
+saved artifacts, not all observed crash executions. Raw AFL crash inputs lacking
+an associated schedule are counted as unpaired and are not replayed with an invented
+schedule. `all_attempts_failed` means every requested attempt produced a failure;
+it is not a guarantee of deterministic reproduction or of a single failure cause.
+Replay errors are recorded separately from the completed timed campaign status.
+
+Validation: `python3 /opt/period-wip/test_replay.py` exercises real native fixture
+processes for assertions, signals, timeouts, input pairing, and runtime mismatches;
+it also checks transient CPU-limit changes and diagnostic normalization.

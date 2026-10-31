@@ -7,6 +7,7 @@ import shlex
 import signal
 import uuid
 import run_hiverff as runner
+from machine_conditions import ConfigurationAudit, observe_trial
 
 MODES = [('local', 'local'), ('global', 'local'), ('local', 'shared'), ('global', 'shared')]
 
@@ -34,14 +35,22 @@ def main(argv=None):
     parser.add_argument('--seed-base', type=int, default=1000)
     parser.add_argument('--afl-sync', choices=('on', 'off'), default='on', help='Fixed across all arms; on matches September comparisons.')
     parser.add_argument('--all-rff', choices=('on','off'), default='on', help='Explicit runtime feedback mode; on matches the working baseline.')
+    parser.add_argument('--replay-crashes', type=int, default=0, metavar='N',
+                        help='After all timed runs, replay up to N saved crash schedules per trial; 0 disables replay.')
+    parser.add_argument('--replay-attempts', type=int, default=3)
+    parser.add_argument('--replay-timeout', type=float, default=8.0)
     parser.add_argument('--dry-run', action='store_true')
     args = parser.parse_args(argv)
+    if args.replay_crashes < 0 or args.replay_attempts < 1 or args.replay_timeout <= 0:
+        parser.error("Replay sample must be nonnegative; attempts and timeout must be positive.")
     # Use the runner's validation, including full seed range, before writing anything.
     runner.configure_cli(['--target', args.target, '--seconds', str(args.seconds),
                           '--workers', str(args.workers), '--trials', str(args.trials),
                           '--seed-base', str(args.seed_base), '--afl-sync', args.afl_sync, '--all-rff', args.all_rff])
     runs = plan(args)
     print(f'{len(runs)} sequential runs; {len(runs)*args.seconds/60:g} minutes of trial budgets, plus one build/startup.')
+    if args.replay_crashes:
+        print(f'Post-run replay: up to {len(runs)*args.replay_crashes*args.replay_attempts} executions, outside trial budgets.')
     if args.dry_run:
         for replicate, options in runs:
             command = ' '.join(shlex.quote(option) for option in options)
@@ -49,12 +58,14 @@ def main(argv=None):
         return 0
     destination = runner.OUT_ROOT / 'ablations' / (datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ') + '-' + uuid.uuid4().hex[:8])
     destination.mkdir(parents=True)
-    manifest = {'schema_version': 12, 'frequency_policy': runner.FREQUENCY_POLICY,
+    manifest = {'schema_version': 13, 'frequency_policy': runner.FREQUENCY_POLICY,
                 'feedback_identity_policy': runner.FEEDBACK_IDENTITY_POLICY,
                 'preprocessing_policy': runner.PREPROCESSING_POLICY,
                 'profiling': runner.profiling_settings(),
                 'status': 'setting_up', 'settings': vars(args), 'runs': [],
                 'build_strategy': 'once_per_ablation', 'machine_before': runner.machine_snapshot()}
+    audit = ConfigurationAudit()
+    audit.observe(manifest['machine_before'], 'campaign:before')
     record = destination / 'ablation.json'
     runner.save_json(record, manifest)
     print(f'Ablation records: {record}', flush=True)
@@ -84,21 +95,47 @@ def main(argv=None):
                 trial = json.loads((experiment / result['trials'][0]['record']).read_text())
                 if not trial['measurement_complete'] or trial.get('worker_abort_reasons') or trial.get('manager_returncode_after_stop') != 0:
                     raise RuntimeError(f'Incomplete metrics or worker failure in {experiment}; inspect its record before continuing.')
+                observe_trial(audit, (experiment / result['trials'][0]['record']).parent, trial)
+                manifest['machine_configuration_audit'] = audit.result()
+                if audit.change_count:
+                    print('TIMING WARNING: CPU configuration changed during the campaign; timing comparisons are flagged.')
                 workers = trial.get('workers', {})
                 if len(workers) != args.workers or any(
                         (worker.get('metrics') or {}).get('schedule_bitmap_nonempty_returns', 0) <= 0
                         for worker in workers.values()):
                     raise RuntimeError(f'Missing nonempty schedule feedback from one or more workers in {experiment}; do not use this campaign for a sharing comparison. Check ALL_RFF and instrumentation.')
                 manifest.pop('active_run', None)
-        manifest['status'] = 'completed'
+            manifest['machine_after'] = runner.machine_snapshot()
+            audit.observe(manifest['machine_after'], 'campaign:after-timed-runs')
+            manifest['machine_configuration_audit'] = audit.result()
+            manifest['status'] = 'completed'
+            print('CPU configuration audit:', manifest['machine_configuration_audit']['status'], flush=True)
+            runner.save_json(record, manifest)
+            if args.replay_crashes:
+                import replay_crashes
+                manifest['replay_status'] = 'running'
+                runner.save_json(record, manifest)
+                report = replay_crashes.replay_campaign(record, args.replay_crashes,
+                    args.replay_attempts, args.replay_timeout, acquire_lock=False)
+                replay_result = json.loads(report.read_text())
+                manifest.update(replay_status=replay_result['status'], replay_report=str(report))
     except KeyboardInterrupt:
-        manifest['status'] = 'interrupted'
+        if manifest.get('replay_status') == 'running':
+            manifest['replay_status'] = 'interrupted'
+        else:
+            manifest['status'] = 'interrupted'
         return 130
     except Exception as exc:
-        manifest.update(status='failed', error=str(exc))
+        if manifest.get('replay_status') == 'running':
+            manifest.update(replay_status='failed', replay_error=str(exc))
+        else:
+            manifest.update(status='failed', error=str(exc))
         raise
     finally:
-        manifest['machine_after'] = runner.machine_snapshot()
+        if 'machine_after' not in manifest:
+            manifest['machine_after'] = runner.machine_snapshot()
+            audit.observe(manifest['machine_after'], 'campaign:stopped')
+        manifest['machine_configuration_audit'] = audit.result()
         runner.save_json(record, manifest)
     return 0
 

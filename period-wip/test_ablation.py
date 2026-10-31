@@ -46,6 +46,31 @@ class Ablation(unittest.TestCase):
         self.stack.enter_context(patch.object(r, 'machine_snapshot', return_value={'test_snapshot': True}))
         self.stack.enter_context(contextlib.redirect_stdout(io.StringIO()))
 
+    def test_replay_runs_after_all_timed_trials_under_lock(self):
+        def replay(path, maximum, attempts, timeout, acquire_lock):
+            self.assertEqual(len(self.calls), 4)
+            self.assertEqual((maximum, attempts, timeout, acquire_lock), (16, 3, 8.0, False))
+            with self.assertRaises(BlockingIOError):
+                with r.experiment_lock():
+                    self.fail('Replay must retain campaign lock')
+            result = path.parent / 'fixture-replay.json'
+            r.save_json(result, {'status': 'completed'})
+            return result
+        with patch('replay_crashes.replay_campaign', side_effect=replay) as call:
+            self.assertEqual(a.main(self.args + ['--replay-crashes', '16']), 0)
+        self.assertEqual(call.call_count, 1)
+        manifest = json.loads(next((self.root / 'out/ablations').glob('*/ablation.json')).read_text())
+        self.assertEqual(manifest['replay_status'], 'completed')
+        self.assertEqual(manifest['status'], 'completed')
+
+    def test_replay_failure_preserves_timed_result(self):
+        with patch('replay_crashes.replay_campaign', side_effect=RuntimeError('runtime mismatch')):
+            with self.assertRaisesRegex(RuntimeError, 'runtime mismatch'):
+                a.main(self.args + ['--replay-crashes', '16'])
+        manifest = json.loads(next((self.root / 'out/ablations').glob('*/ablation.json')).read_text())
+        self.assertEqual(manifest['status'], 'completed')
+        self.assertEqual(manifest['replay_status'], 'failed')
+
     def fake_build(self, log):
         self.build_calls += 1
         for path in self.runtime:

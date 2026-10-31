@@ -8,6 +8,7 @@ import resource
 import shutil
 import argparse
 import shlex
+from machine_conditions import ConfigurationAudit, observe_trial
 from contextlib import contextmanager
 
 # ==========================================
@@ -157,7 +158,8 @@ def validate_preprocessing_tools():
 def source_fingerprints():
     paths = [Path(__file__), Path(__file__).with_name('run_ablation.py')]
     paths += [Path('/opt/period-wip') / name for name in
-              ('hivemind.c','mutator.zig','hive_metrics.h','afl-fuzz.c','libsched.cpp')]
+              ('hivemind.c','mutator.zig','hive_metrics.h','afl-fuzz.c','libsched.cpp',
+               'machine_conditions.py','replay_crashes.py')]
     paths += [Path('/opt/sched-fuzz/AFL-2.57b') / name for name in ('afl-fuzz.c','hive_metrics.h')]
     paths.append(Path('/opt/sched-fuzz/libsched.cpp'))
     paths += preprocessing_tools()
@@ -197,7 +199,7 @@ def prepare_build(directory):
         if fingerprint(copy) != expected:
             raise RuntimeError('Runtime changed while archiving: ' + path)
         copies[path] = str(copy.relative_to(directory))
-    build = {'schema_version': 12, 'target': TARGET_PROG, 'built_at': utc_now(),
+    build = {'schema_version': 13, 'target': TARGET_PROG, 'built_at': utc_now(),
              'frequency_policy': FREQUENCY_POLICY, 'preprocessing_policy': PREPROCESSING_POLICY, 'profiling': profiling_settings(), 'source_sha256': source_fingerprints(),
              'feedback_identity_policy': FEEDBACK_IDENTITY_POLICY,
              'runtime_sha256': runtime, 'input_sha256': inputs, 'seed_sha256': seeds,
@@ -431,8 +433,11 @@ def run_trial(experiment, number):
     # Record relevant inherited overrides without dumping unrelated secrets.
     effective = {k: v for k, v in env.items() if k.startswith("AFL_") or k in
                  set(settings) | {"MASK", "SEED", "LD_PRELOAD", "SCHEDULE", "HIVEMIND_SHM",
-                                  "ALL_RFF", "RECORD_EXACT_RFS", "HIVE_PROFILE"}}
-    record = {"schema_version": 12, "trial": number, "mode": MODE,
+                                  "ALL_RFF", "RECORD_EXACT_RFS", "HIVE_PROFILE", "NO_RFF", "NO_POS",
+                                  "POS_ONLY", "TIMER_MAX", "THREAD_AFFINITY", "PRIORITY_CHANGE_FREQ_PCT",
+                                  "ATOMIC", "JSON_SCHEDULE", "UBSAN_OPTIONS", "TSAN_OPTIONS",
+                                  "MSAN_OPTIONS", "LD_LIBRARY_PATH"}}
+    record = {"schema_version": 13, "trial": number, "mode": MODE,
               "status": "running", "started_at": utc_now(), "sharing": sharing_settings(), "frequency_policy": FREQUENCY_POLICY, "preprocessing_policy": PREPROCESSING_POLICY, "profiling": profiling_settings(),
               "feedback_identity_policy": FEEDBACK_IDENTITY_POLICY,
               "time_budget_sec": TIME_BUDGET, "environment": effective,
@@ -528,6 +533,9 @@ def run_trial(experiment, number):
             record.update(status="failed", error="One or more workers produced no fuzzer_stats; inspect console.log.")
         if record.get('worker_abort_reasons') or (record['status'] in ('timeout','budget_completed') and record.get('manager_returncode_after_stop') not in (None,0)):
             record.update(status='failed', error='Worker or manager failed; inspect console.log.')
+        audit = ConfigurationAudit()
+        observe_trial(audit, directory, record)
+        record["machine_configuration_audit"] = audit.result()
         save_json(directory / "record.json", record)
     print(f"Trial {number}: {record['status']} — {directory}")
     if record.get('preprocessing_complete') is not None:
@@ -538,6 +546,8 @@ def run_trial(experiment, number):
             print(f"  RF pairs per worker: {min(available)}–{max(available)}; "
                   f"workers with zero pairs: {sum(n == 0 for n in available)}; "
                   f"generated schedules with changed obligations: {changes}")
+    if record["machine_configuration_audit"]["status"] == "changed":
+        print("  TIMING WARNING: CPU configuration changed; see machine_configuration_audit in record.json.")
     for reason in record.get("worker_abort_reasons", []):
         print(f"  Worker error: {reason}")
     if not record["measurement_complete"]:
@@ -563,7 +573,7 @@ def run_experiment(prepared=None):
     experiment = OUT_ROOT / "experiments" / name
     experiment.mkdir(parents=True)
     planned = NUM_TRIALS
-    manifest = {"schema_version": 12, "status": "setting_up", "started_at": utc_now(),
+    manifest = {"schema_version": 13, "status": "setting_up", "started_at": utc_now(),
                 "target": TARGET_PROG, "mode": MODE, "workers": WORKERS,
                 "time_budget_sec": TIME_BUDGET, "planned_trials": planned,
                 "configured_num_trials": NUM_TRIALS, "sharing": sharing_settings(), "frequency_policy": FREQUENCY_POLICY, "preprocessing_policy": PREPROCESSING_POLICY, "profiling": profiling_settings(), "seed_base": SEED_BASE,

@@ -1,4 +1,4 @@
-# Measurement semantics (runner schema 12, worker schema 11)
+# Measurement semantics (runner schema 13, worker schema 11)
 
 The standalone runner copies and rebuilds `afl-fuzz.c`, `mutator.zig`, `hive_metrics.h`, and `libsched.cpp` from period-wip, then compiles hivemind.c. No Docker image rebuild is required. Use the same mounted-file runner command as before. The ablation controller builds once for all arms, archives the artifacts, and checks fingerprints before and after trials. See EXPERIMENT_RECORDS.md for the controlled comparison commands.
 
@@ -135,7 +135,7 @@ local uses the existing Zig trace-hash map. The observational local table stays 
 both modes. Population and diagnostic changes are described above. No measured time-savings claim is added.
 
 
-## Opt-in profiling (runner schema 12, worker schema 11)
+## Opt-in profiling (runner schema 13, worker schema 11)
 
 The scheduling policy remains guarded_frequency_energy_v4. Set `HIVE_PROFILE=1`
 for phase_timing_schedule_fingerprints_v1 diagnostics; unset it or use 0 for regular
@@ -191,7 +191,7 @@ not account for all timing-probe overhead. Treat this as a diagnostic campaign,
 not direct proof of a throughput improvement over unprofiled runs.
 
 
-## Checked preprocessing (runner schema 12, worker schema 11)
+## Checked preprocessing (runner schema 13, worker schema 11)
 
 `preprocessing_policy=checked_worker_local_pairs_v1` fixes a missing relative
 all_event_pairs.py invocation that previously left workers without RF constraints.
@@ -236,3 +236,21 @@ real pair generation with fixture conversion/prediction tools, successful/empty 
 missing/malformed/mismatched/invalid-score data, no partial update on invalid data,
 structural mutation generation, command failure/signals, missing executables/tools,
 and isolated worker outputs. Full Java/target replay still requires the Docker smoke run.
+
+## Runner schema 13: replay and machine configuration
+
+`machine_configuration_audit.timing_configuration_consistent` is false when any
+sampled configuration field changes (including loss of an observed field), true
+when at least two samples have stable observed configuration, and null when
+unavailable or insufficient. This is independent of `measurement_complete`:
+complete execution counters can still belong to an unsuitable timing comparison.
+Campaign auditing spans build/setup, the intervals between arms, and every stored
+trial timeline sample. It stops before optional replay.
+
+Replay schema 1 groups assertion/sanitizer diagnostics, records unclassified
+signals separately, and deliberately leaves `distinct_bug_count` null. Case-level
+reproduction uses repeated independent executions of saved schedule plus original
+queue input; multiple signature groups may appear for the same case. Reports are
+stored separately and do not update trial crash counters or first-crash timing.
+Byte-distinct input/schedule pairs are artifact identities, not interleavings.
+See EXPERIMENT_RECORDS.md for selection bias, execution environment, and commands.
